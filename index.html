@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Index Card Board</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#eef0f3;--col:#f8f9fb;--card:#fff;--text:#1d2330;--mut:#6b7385;--line:#d9dde5;--yel:#fde68a;--red:#fecaca;--redt:#b91c1c;--acc:#2563eb;--ok:#16a34a}
+:root[data-theme="dark"]{--bg:#12151b;--col:#1b2029;--card:#252b37;--text:#e8ebf1;--mut:#9aa3b5;--line:#343b4a;--yel:#6b5410;--red:#7f1d1d;--redt:#fca5a5;--acc:#6b9bff;--ok:#4ade80}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{background:var(--bg);color:var(--text);font:15px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column;overflow:hidden}
+body.dnd{user-select:none;-webkit-user-select:none;cursor:grabbing}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}
+input,textarea,select{font:inherit;color:var(--text);background:var(--card);border:1px solid var(--line);border-radius:5px;padding:4px 6px;min-width:0}
+#bar{display:flex;gap:8px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--line);background:var(--col);flex-wrap:wrap}
+#bar h1{font-size:14px;margin:0 6px 0 0}
+#newproj{width:220px}
+.btn{border:1px solid var(--line);background:var(--card);border-radius:5px;padding:3px 8px}
+.btn:hover{border-color:var(--acc)}
+.btn.danger{color:var(--redt)}
+#note{font-size:12.5px;color:var(--mut);padding:2px 10px;background:var(--col);border-bottom:1px solid var(--line)}
+#board{flex:1;min-height:0;display:flex;gap:8px;padding:8px;overflow-x:auto;align-items:flex-start}
+#projs{display:flex;gap:8px;align-items:flex-start;max-height:100%;min-width:12px}
+.col{width:272px;flex:none;max-height:100%;display:flex;flex-direction:column;background:var(--col);border:1px solid var(--line);border-radius:8px}
+#unsorted{position:sticky;left:0;z-index:5;box-shadow:6px 0 8px -6px rgba(0,0,0,.25)}
+#ongoing{border-style:dashed}
+#later{width:285px}
+.col.over{outline:2px solid var(--acc)}
+.pcol>.ph{cursor:grab}
+.ph{display:flex;align-items:center;gap:6px;padding:8px 9px;border-bottom:1px solid var(--line);border-radius:8px 8px 0 0}
+.ph.od{background:var(--red)}
+.ph .pt{font-size:16px;font-weight:650;flex:1;cursor:pointer;overflow-wrap:anywhere}
+.ph .cnt{color:var(--mut);font-size:12.5px}
+.grip{cursor:grab;color:var(--mut);touch-action:none;padding:0 2px}
+.tasks{flex:1;overflow-y:auto;min-height:34px;padding:4px;display:flex;flex-direction:column;gap:2px}
+.task{display:grid;grid-template-columns:20px 1fr auto;gap:5px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:5px;padding:5px 6px;cursor:grab}
+.task.blocked{background:var(--yel)}
+.task.overdue{background:var(--red);border-color:var(--redt)}
+.task .tt{cursor:pointer;overflow-wrap:anywhere}
+.task.done .tt{text-decoration:line-through;opacity:.55}
+.chk{width:18px;height:18px;border:1.5px solid var(--mut);border-radius:4px;display:grid;place-items:center;font-size:11px;line-height:1}
+.task.done .chk{background:var(--ok);border-color:var(--ok);color:#fff}
+.meta{font-size:12.5px;color:var(--mut);display:flex;gap:6px;flex-wrap:wrap}
+.dl.fut{color:var(--redt)}
+.dl.od{color:var(--redt);font-weight:700}
+.acts{display:flex;gap:1px;align-items:center}
+.acts button{opacity:.9;padding:1px 3px;border-radius:4px}
+.acts .wait{opacity:0}
+.task:hover .wait,.acts .wait:focus-visible{opacity:.45}
+.acts .wait.on{opacity:1}
+.acts button:hover{background:rgba(127,127,127,.2)}
+.dragging{opacity:.35}
+#ghost{position:fixed;z-index:50;pointer-events:none;opacity:.92;box-shadow:0 6px 18px rgba(0,0,0,.35);transform:rotate(1.5deg)}
+#ind{position:fixed;z-index:40;pointer-events:none;background:var(--acc);display:none;border-radius:2px}
+.add{margin:0 4px 4px;width:calc(100% - 8px)}
+.lrow{display:flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:5px;padding:6px 8px;cursor:grab}
+.lrow.od{background:var(--red);border-color:var(--redt)}
+.lrow .pt{flex:1;cursor:pointer;overflow-wrap:anywhere}
+.empty{color:var(--mut);font-size:11px;padding:4px}
+#menu{position:fixed;z-index:60;background:var(--card);border:1px solid var(--line);border-radius:7px;box-shadow:0 6px 20px rgba(0,0,0,.3);padding:3px;min-width:170px;max-height:70vh;overflow:auto;display:none}
+#menu button{display:block;width:100%;text-align:left;padding:4px 8px;border-radius:4px}
+#menu button:hover{background:var(--bg)}
+#menu .sep{font-size:11px;color:var(--mut);padding:4px 8px 1px}
+#ov{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:70;display:none;align-items:center;justify-content:center;padding:12px}
+#modal{background:var(--col);border:1px solid var(--line);border-radius:10px;width:min(480px,100%);max-height:92vh;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:8px}
+#modal label{font-size:11px;color:var(--mut);display:block;margin-bottom:2px}
+#modal input,#modal textarea,#modal select{width:100%}
+#modal textarea{min-height:130px;resize:vertical}
+.row{display:flex;gap:6px;flex-wrap:wrap;justify-content:space-between;align-items:center}
+.task{height:62px;flex:none;overflow:hidden}
+.task>div:nth-child(2){min-width:0}
+.task .tt{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.25}
+.meta{margin-top:1px;line-height:1.2;flex-wrap:nowrap;white-space:nowrap}
+.pcol>.ph{background:#dbe7fb;border-bottom:2px solid var(--acc);padding:10px 9px}
+.pcol>.ph .pt{font-size:18px;font-weight:750;color:#1e3a8a;line-height:1.2}
+.pcol>.ph .cnt{color:#1e3a8a;font-weight:600}
+.pcol>.ph.od{background:var(--red)}
+.pcol>.ph.od .pt,.pcol>.ph.od .cnt{color:#7f1d1d}
+</style></head>
+<body>
+<div id="bar">
+ <h1>Board</h1>
+ <input id="newproj" placeholder="+ New project (Enter)">
+ <span style="flex:1"></span>
+ <span id="sync" style="font-size:12.5px;color:var(--mut)"></span><button class="btn" id="sin" style="display:none">Sign in with Google</button><button class="btn" id="sout" style="display:none">Sign out</button>
+ <button class="btn" id="exp">Export Backup</button>
+ <button class="btn" id="imp">Restore Backup</button>
+ <input type="file" id="file" accept=".json,application/json" hidden>
+</div>
+<div id="note">Saved in this browser and, once you sign in, to your private cloud copy so all your devices stay in sync. Exporting a backup now and then is still a good extra.</div>
+<div id="board"></div>
+<div id="ind"></div><div id="menu"></div>
+<div id="ov"><div id="modal"></div></div>
+<script>
+/* ====== PASTE YOUR FIREBASE WEB-APP CONFIG HERE (Project settings > Your apps) ====== */
+const FB={apiKey:"AIzaSyCi-YeyYSXgSXJFunOb5zBWP71RSuVCbjc",authDomain:"dylan-s-planner.firebaseapp.com",projectId:"dylan-s-planner",appId:"1:958797648742:web:d004fdcc8ae43ce3ddeea7"};
+/* ================================================================================= */
+const KEY='index-card-board-v1';
+const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-3);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let S=load(),meta=loadMeta();
+function blank(){return{active:[],later:[],unsorted:[]}}
+function norm(d){if(d.ongoing&&d.ongoing.length)d.active.push({id:uid(),title:'Ongoing Work',notes:'',deadline:'',tasks:d.ongoing});delete d.ongoing;return d}
+function load(){try{const r=localStorage.getItem(KEY);if(r){const d=JSON.parse(r);if(valid(d))return norm(d)}}catch(e){}return blank()}
+function persist(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function loadMeta(){try{return JSON.parse(localStorage.getItem(KEY+'-meta'))||{synced:'',dirty:false}}catch(e){return{synced:'',dirty:false}}}
+function saveMeta(){try{localStorage.setItem(KEY+'-meta',JSON.stringify(meta))}catch(e){}}
+function changed(){persist();meta.dirty=true;editSeq++;saveMeta();schedulePush()}
+function save(){changed()}
+function vTask(t){return t&&typeof t==='object'&&typeof t.id==='string'&&typeof t.title==='string'&&typeof t.notes==='string'&&(t.deadline===''||/^\d{4}-\d{2}-\d{2}$/.test(t.deadline))&&typeof t.done==='boolean'&&typeof t.blocked==='boolean'}
+function vProj(p){return p&&typeof p==='object'&&typeof p.id==='string'&&typeof p.title==='string'&&typeof p.notes==='string'&&(p.deadline===''||/^\d{4}-\d{2}-\d{2}$/.test(p.deadline))&&Array.isArray(p.tasks)&&p.tasks.every(vTask)}
+function valid(d){if(!d||typeof d!=='object')return false;for(const k of['active','later'])if(!Array.isArray(d[k])||!d[k].every(vProj))return false;if(!Array.isArray(d.unsorted)||!d.unsorted.every(vTask))return false;if(d.ongoing!==undefined&&(!Array.isArray(d.ongoing)||!d.ongoing.every(vTask)))return false;
+ const ids=[];[...d.active,...d.later].forEach(p=>{ids.push(p.id);p.tasks.forEach(t=>ids.push(t.id))});[...d.unsorted,...(d.ongoing||[])].forEach(t=>ids.push(t.id));return new Set(ids).size===ids.length}
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const od=d=>d&&d<today();
+function fmt(d){const[y,m,dd]=d.split('-').map(Number);const o=new Date(y,m-1,dd);return o.toLocaleDateString(undefined,{month:'short',day:'numeric',...(y!==new Date().getFullYear()?{year:'numeric'}:{})})}
+const mkTask=title=>({id:uid(),title,notes:'',deadline:'',done:false,blocked:false});
+const allProjs=()=>[...S.active,...S.later];
+const findProj=id=>allProjs().find(p=>p.id===id);
+function listOf(col){return col==='unsorted'?S.unsorted:(S.active.find(p=>p.id===col)||{}).tasks}
+function findTask(id){for(const col of['unsorted',...allProjs().map(p=>p.id)]){const l=col==='unsorted'?S.unsorted:findProj(col).tasks;const i=l.findIndex(t=>t.id===id);if(i>=0)return{l,i,t:l[i],col}}return null}
+function moveTask(id,col,idx){const f=findTask(id);if(!f)return;const dest=listOf(col);if(!dest)return;f.l.splice(f.i,1);if(idx==null||idx>dest.length)idx=dest.length;dest.splice(idx,0,f.t)}
+function moveProj(id,idx){/* idx among active excluding the moved one; moves to active */
+ let p=S.active.find(x=>x.id===id);if(p)S.active=S.active.filter(x=>x!==p);else{p=S.later.find(x=>x.id===id);S.later=S.later.filter(x=>x!==p)}
+ if(!p)return;if(idx==null||idx>S.active.length)idx=S.active.length;S.active.splice(idx,0,p)}
+function toLater(id){const p=S.active.find(x=>x.id===id);if(!p)return;S.active=S.active.filter(x=>x!==p);S.later.push(p)}
+
+/* ---------- render ---------- */
+function taskHTML(t){
+ const over=!t.done&&od(t.deadline),cls=(t.done?' done':'')+(t.blocked&&!t.done?' blocked':'')+(over?' overdue':'');
+ return `<div class="task${cls}" data-task="${t.id}"><button class="chk" data-act="done" data-id="${t.id}" title="Complete">${t.done?'✓':''}</button>
+ <div><div class="tt" data-act="open-t" data-id="${t.id}" title="${esc(t.title)}">${esc(t.title)}</div>${t.deadline?`<div class="meta"><span class="dl ${over?'od':'fut'}">📅 ${fmt(t.deadline)}${over?' · OVERDUE':''}</span></div>`:''}</div>
+ <div class="acts">${t.notes?'<span title="Has notes">📄</span>':''}<button class="wait${t.blocked?' on':''}" data-act="block" data-id="${t.id}" title="Waiting / blocked">⏳</button><button data-act="menu-t" data-id="${t.id}" title="Move / more">⋯</button></div></div>`}
+function colHTML(id,head,tasks,extra=''){
+ return `<section class="col" id="${id==='unsorted'?id:''}" data-col="${id}">${head}<div class="tasks">${tasks.map(taskHTML).join('')}</div><input class="add" data-add="${id}" placeholder="+ Add task (Enter)"></section>`}
+function projHTML(p){
+ const n=p.tasks.filter(t=>!t.done).length,over=od(p.deadline);
+ return `<section class="col pcol" data-col="${p.id}" data-proj="${p.id}"><div class="ph${over?' od':''}"><span class="grip" data-pgrip title="Drag to reprioritize">⠿</span><span class="pt" data-act="open-p" data-id="${p.id}">${esc(p.title)}</span>${p.notes?'<span title="Has notes">📄</span>':''}${p.deadline?`<span class="dl ${over?'od':'fut'}">📅 ${fmt(p.deadline)}${over?' · OVERDUE':''}</span>`:''}<span class="cnt">${n}</span><button data-act="menu-p" data-id="${p.id}" title="More">⋯</button></div>
+ <div class="tasks">${p.tasks.map(taskHTML).join('')}</div><input class="add" data-add="${p.id}" placeholder="+ Add task (Enter)"></section>`}
+function laterHTML(){
+ return `<section class="col" id="later"><div class="ph"><span class="pt" style="cursor:default">Later Projects</span><span class="cnt">${S.later.length}</span></div><div class="tasks">${S.later.map(p=>{const n=p.tasks.filter(t=>!t.done).length,o=od(p.deadline);
+ return `<div class="lrow${o?' od':''}" data-lrow="${p.id}"><span class="pt" data-act="open-p" data-id="${p.id}">${esc(p.title)}</span>${p.notes?'<span title="Has notes">📄</span>':''}${p.deadline?`<span class="dl ${o?'od':'fut'}">📅 ${fmt(p.deadline)}${o?' · OVERDUE':''}</span>`:''}<span class="cnt" title="Incomplete tasks">${n}</span><button class="btn" data-act="activate" data-id="${p.id}" title="Make active">▶ Activate</button></div>`}).join('')||'<div class="empty">Drag a project here to set it aside.</div>'}</div></section>`}
+let refocus=null;
+function render(){
+ const b=document.getElementById('board'),sl=b.scrollLeft;
+ const st={};document.querySelectorAll('.tasks').forEach(e=>{const c=e.closest('[data-col],#later');if(c)st[c.dataset.col||'later']=e.scrollTop});
+ b.innerHTML=colHTML('unsorted','<div class="ph"><span class="pt" style="cursor:default">Unsorted Tasks</span><span class="cnt">'+S.unsorted.filter(t=>!t.done).length+'</span></div>',S.unsorted)
+  +'<div id="projs">'+S.active.map(projHTML).join('')+'</div>'
+  +laterHTML();
+ b.scrollLeft=sl;document.querySelectorAll('.tasks').forEach(e=>{const c=e.closest('[data-col],#later');const k=c&&(c.dataset.col||'later');if(k in st)e.scrollTop=st[k]});
+ if(refocus){const i=document.querySelector(`[data-add="${refocus}"]`);if(i)i.focus();refocus=null}
+}
+const commit=()=>{render();changed()};
+
+/* ---------- add ---------- */
+document.getElementById('newproj').addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.value.trim()){S.active.push({id:uid(),title:e.target.value.trim(),notes:'',deadline:'',tasks:[]});e.target.value='';commit();const b=document.getElementById('board');b.scrollLeft=b.scrollWidth}});
+document.addEventListener('keydown',e=>{const c=e.target.dataset&&e.target.dataset.add;if(c&&e.key==='Enter'&&!e.isComposing&&e.target.value.trim()){const l=listOf(c);if(l){l.push(mkTask(e.target.value.trim()));refocus=c;commit();const t=document.querySelector(`[data-col="${c}"] .tasks`);if(t)t.scrollTop=t.scrollHeight}}});
+
+/* ---------- clicks ---------- */
+let noClick=false;
+document.addEventListener('click',e=>{
+ if(noClick)return;
+ const m=document.getElementById('menu');if(!e.target.closest('#menu')&&!e.target.closest('[data-act^="menu"]'))m.style.display='none';
+ const a=e.target.closest('[data-act]');if(!a)return;const id=a.dataset.id,act=a.dataset.act;
+ if(act==='done'){const f=findTask(id);f.t.done=!f.t.done;commit()}
+ else if(act==='block'){const f=findTask(id);f.t.blocked=!f.t.blocked;commit()}
+ else if(act==='open-t')openTask(id);
+ else if(act==='open-p')openProj(id);
+ else if(act==='activate'){moveProj(id,null);commit()}
+ else if(act==='menu-t')menuTask(id,a);
+ else if(act==='menu-p')menuProj(id,a);
+ else if(act==='mv'){const[k,...r]=a.dataset.arg.split('|');m.style.display='none';doMenu(k,id,r[0])}
+});
+function showMenu(items,a){const m=document.getElementById('menu');m.innerHTML=items.join('');m.style.display='block';const r=a.getBoundingClientRect();m.style.left=Math.max(4,Math.min(r.left,innerWidth-m.offsetWidth-4))+'px';m.style.top=Math.max(4,Math.min(r.bottom+2,innerHeight-m.offsetHeight-4))+'px'}
+const mi=(label,id,arg)=>`<button data-act="mv" data-id="${id}" data-arg="${arg}">${label}</button>`;
+function menuTask(id,a){const f=findTask(id);const it=[mi('↑ Move up',id,'up'),mi('↓ Move down',id,'down'),mi('Toggle waiting',id,'blk'),mi('Details…',id,'tdet'),'<div class="sep">Move to</div>'];
+ if(f.col!=='unsorted')it.push(mi('Unsorted Tasks',id,'to|unsorted'));S.active.forEach(p=>{if(p.id!==f.col)it.push(mi(esc(p.title),id,'to|'+p.id))});showMenu(it,a)}
+function menuProj(id,a){showMenu([mi('← Move left',id,'left'),mi('→ Move right',id,'right'),mi('Move to Later',id,'later'),mi('Details…',id,'pdet')],a)}
+function doMenu(k,id,arg){
+ if(k==='up'||k==='down'){const f=findTask(id),j=f.i+(k==='up'?-1:1);if(j>=0&&j<f.l.length){[f.l[f.i],f.l[j]]=[f.l[j],f.l[f.i]]}}
+ else if(k==='to')moveTask(id,arg,null);
+ else if(k==='blk'){const f=findTask(id);f.t.blocked=!f.t.blocked}
+ else if(k==='tdet')return openTask(id);
+ else if(k==='pdet')return openProj(id);
+ else if(k==='left'||k==='right'){const i=S.active.findIndex(p=>p.id===id),j=i+(k==='left'?-1:1);if(j>=0&&j<S.active.length)[S.active[i],S.active[j]]=[S.active[j],S.active[i]]}
+ else if(k==='later')toLater(id);
+ commit()}
+
+/* ---------- modals ---------- */
+const ov=document.getElementById('ov'),modal=document.getElementById('modal');
+function closeModal(){ov.style.display='none';modal.innerHTML='';conflictOpen=false;render()}
+ov.addEventListener('mousedown',e=>{if(e.target===ov)closeModal()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(drag)cancelDrag();else if(ov.style.display==='flex')closeModal();document.getElementById('menu').style.display='none'}});
+function ask(msg,label,cb,danger){ov.style.display='flex';modal.innerHTML=`<div>${esc(msg)}</div><div class="row"><button class="btn" id="mc">Cancel</button><button class="btn ${danger?'danger':''}" id="mo">${esc(label)}</button></div>`;document.getElementById('mc').onclick=closeModal;document.getElementById('mo').onclick=()=>{ov.style.display='none';modal.innerHTML='';cb()}}
+function bind(obj,fields){fields.forEach(([sel,key])=>{const el=modal.querySelector(sel);el.addEventListener('input',()=>{obj[key]=el.value;save()});el.addEventListener('change',()=>{obj[key]=el.value;save()})})}
+function openTask(id){const f=findTask(id);if(!f)return;const t=f.t;ov.style.display='flex';
+ modal.innerHTML=`<div><label>Task title</label><input id="f1" value="${esc(t.title)}"></div><div><label>Notes</label><textarea id="f2">${esc(t.notes)}</textarea></div>
+ <div class="row"><div style="flex:1"><label>Deadline</label><input type="date" id="f3" value="${t.deadline}"></div><div style="flex:1"><label>Status</label><select id="f4"><option value="open">Not complete</option><option value="blocked">Waiting / blocked</option><option value="done">Complete</option></select></div></div>
+ <div class="row"><button class="btn danger" id="del">Delete task</button><button class="btn" id="cl">Done</button></div>`;
+ bind(t,[['#f1','title'],['#f2','notes'],['#f3','deadline']]);const s=modal.querySelector('#f4');s.value=t.done?'done':t.blocked?'blocked':'open';
+ s.onchange=()=>{t.done=s.value==='done';t.blocked=s.value==='blocked';save()};
+ modal.querySelector('#cl').onclick=closeModal;modal.querySelector('#del').onclick=()=>ask('Delete this task permanently?','Delete',()=>{const g=findTask(id);g.l.splice(g.i,1);commit()},1)}
+function openProj(id){const p=findProj(id);if(!p)return;const act=S.active.includes(p);ov.style.display='flex';
+ modal.innerHTML=`<div><label>Project title</label><input id="f1" value="${esc(p.title)}"></div><div><label>Notes</label><textarea id="f2">${esc(p.notes)}</textarea></div>
+ <div><label>Project deadline</label><input type="date" id="f3" value="${p.deadline}"></div>
+ <div class="row"><button class="btn" id="mv">${act?'Move to Later Projects':'Make active'}</button><button class="btn danger" id="del">Delete project</button><button class="btn" id="cl">Done</button></div>`;
+ bind(p,[['#f1','title'],['#f2','notes'],['#f3','deadline']]);
+ modal.querySelector('#cl').onclick=closeModal;
+ modal.querySelector('#mv').onclick=()=>{act?toLater(id):moveProj(id,null);closeModal()};
+ modal.querySelector('#del').onclick=()=>ask(`Delete "${p.title}" and its ${p.tasks.length} task(s) permanently?`,'Delete project',()=>{S.active=S.active.filter(x=>x!==p);S.later=S.later.filter(x=>x!==p);commit()},1)}
+
+/* ---------- backup ---------- */
+document.getElementById('exp').onclick=async()=>{
+ const json=JSON.stringify({app:'index-card-board',version:1,exported:new Date().toISOString(),data:S},null,1),name='board-backup-'+today()+'.json';
+ try{const d=window.claude&&await claude.use('downloads');if(d){await d.save({filename:name,data:new Blob([json],{type:'application/json'})});return}}catch(e){if(e&&e.code==='declined')return}
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([json],{type:'application/json'}));a.download=name;document.body.appendChild(a);a.click();a.remove()};
+document.getElementById('imp').onclick=()=>{const f=document.getElementById('file');f.value='';f.click()};
+document.getElementById('file').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
+ r.onload=()=>{let d;try{d=JSON.parse(r.result)}catch(x){return ask('This file is not valid JSON. Your current board was not changed.','OK',()=>{})}
+  if(!d||d.app!=='index-card-board'||!valid(d.data))return ask('This is not a valid board backup. Your current board was not changed.','OK',()=>{});
+  const n=d.data.active.length+d.data.later.length;
+  ask(`Restore this backup (${n} projects)? It will REPLACE everything currently on your board.`,'Replace board',()=>{S=norm(d.data);commit()},1)};
+ r.readAsText(f)};
+
+/* ---------- drag & drop (pointer based, overlay indicator => no layout shift) ---------- */
+let drag=null;const ind=document.getElementById('ind');
+document.addEventListener('pointerdown',e=>{
+ if(e.button!==0||e.target.closest('button,input,textarea,select,#menu,#ov'))return;
+ const t=e.target.closest('[data-task]'),g=e.target.closest('.pcol > .ph'),l=e.target.closest('[data-lrow]');let kind,el,id;
+ if(t){kind='task';el=t;id=t.dataset.task}else if(g){el=g.closest('[data-proj]');kind='proj';id=el.dataset.proj}else if(l){kind='later';el=l;id=l.dataset.lrow}else return;
+ drag={kind,el,id,sx:e.clientX,sy:e.clientY,x:e.clientX,y:e.clientY,on:false,tgt:null,timer:null}});
+document.addEventListener('pointermove',e=>{if(!drag)return;drag.x=e.clientX;drag.y=e.clientY;
+ if(!drag.on){if(Math.hypot(e.clientX-drag.sx,e.clientY-drag.sy)<5)return;startDrag()}
+ e.preventDefault();update()},{passive:false});
+document.addEventListener('pointerup',()=>{if(!drag)return;const d=drag;if(!d.on){drag=null;return}
+ const t=d.tgt;endDrag();noClick=true;setTimeout(()=>noClick=false,0);
+ if(t){if(d.kind==='task')moveTask(d.id,t.col,t.idx);else if(t.later)toLater(d.id);else moveProj(d.id,t.idx);commit()}});
+document.addEventListener('pointercancel',()=>{if(drag)cancelDrag()});
+function startDrag(){const d=drag;d.on=true;const r=d.el.getBoundingClientRect();d.ox=d.sx-r.left;d.oy=d.sy-r.top;
+ const gh=d.el.cloneNode(true);gh.id='ghost';gh.style.width=r.width+'px';if(d.kind==='proj')gh.style.maxHeight='240px';gh.style.overflow='hidden';document.body.appendChild(gh);d.ghost=gh;
+ d.el.classList.add('dragging');document.body.classList.add('dnd');document.getElementById('menu').style.display='none';
+ d.timer=setInterval(()=>{autoscroll();update()},30)}
+function autoscroll(){const b=document.getElementById('board'),r=b.getBoundingClientRect(),d=drag;
+ if(d.x<r.left+50)b.scrollLeft-=14;else if(d.x>r.right-50)b.scrollLeft+=14;
+ if(d.kind==='task'&&d.tgt){const l=document.querySelector(`[data-col="${d.tgt.col}"] .tasks`);if(l){const lr=l.getBoundingClientRect();if(d.y<lr.top+24)l.scrollTop-=10;else if(d.y>lr.bottom-24)l.scrollTop+=10}}}
+function update(){const d=drag;if(!d||!d.on)return;d.ghost.style.left=(d.x-d.ox)+'px';d.ghost.style.top=(d.y-d.oy)+'px';
+ document.querySelectorAll('.over').forEach(x=>x.classList.remove('over'));d.tgt=null;ind.style.display='none';
+ if(d.kind==='task'){
+  let best=null,bd=1e9;document.querySelectorAll('[data-col]').forEach(c=>{const r=c.getBoundingClientRect(),dx=d.x<r.left?r.left-d.x:d.x>r.right?d.x-r.right:0;if(dx<bd){bd=dx;best=c}});
+  if(!best)return;const list=best.querySelector('.tasks'),lr=list.getBoundingClientRect(),rows=[...list.querySelectorAll('.task:not(.dragging)')];
+  let idx=0;for(const w of rows){const r=w.getBoundingClientRect();if(d.y>r.top+r.height/2)idx++;else break}
+  let y=rows.length===0?lr.top+4:idx<rows.length?rows[idx].getBoundingClientRect().top-1:rows[rows.length-1].getBoundingClientRect().bottom+1;
+  y=Math.max(lr.top,Math.min(y,lr.bottom-3));
+  Object.assign(ind.style,{display:'block',left:(lr.left+4)+'px',width:(lr.width-8)+'px',top:y+'px',height:'3px'});d.tgt={col:best.dataset.col,idx};return}
+ const lat=document.getElementById('later'),lr=lat.getBoundingClientRect();
+ if(d.x>lr.left&&d.x<lr.right&&d.y>lr.top&&d.y<lr.bottom){if(d.kind==='proj'){lat.classList.add('over');d.tgt={later:true}}return}
+ const cols=[...document.querySelectorAll('.pcol:not(.dragging)')];let idx=0;for(const c of cols){const r=c.getBoundingClientRect();if(d.x>r.left+r.width/2)idx++;else break}
+ const pr=document.getElementById('projs').getBoundingClientRect();let x,top=pr.top,h=pr.height;
+ if(!cols.length)x=pr.left;else if(idx<cols.length){const r=cols[idx].getBoundingClientRect();x=r.left-5}else x=cols[cols.length-1].getBoundingClientRect().right+3;
+ const ref=(cols[Math.min(idx,cols.length-1)]||document.getElementById('projs')).getBoundingClientRect();top=ref.top;h=Math.max(ref.height,60);
+ Object.assign(ind.style,{display:'block',left:x+'px',width:'3px',top:top+'px',height:h+'px'});d.tgt={idx}}
+function endDrag(){const d=drag;if(d.timer)clearInterval(d.timer);if(d.ghost)d.ghost.remove();d.el.classList.remove('dragging');document.body.classList.remove('dnd');ind.style.display='none';document.querySelectorAll('.over').forEach(x=>x.classList.remove('over'));drag=null}
+function cancelDrag(){if(drag.on)endDrag();else drag=null}
+/* ---------- cloud sync (Firebase Auth + Firestore) ---------- */
+const $=id=>document.getElementById(id);
+let cloud={},pushing=false,pushTimer=null,editSeq=0,conflictOpen=false;
+const isBlank=d=>!d.active.length&&!d.later.length&&!d.unsorted.length;
+const busy=()=>(drag&&drag.on)||ov.style.display==='flex';
+function setStatus(k,x){const m={local:'Saved on this device only (cloud not set up)',out:'Not signed in - saved on this device only',saving:'☁ Saving…',synced:'☁ Synced '+new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}),offline:'Offline - will sync when back online',error:'Sync problem - will retry'};
+ $('sync').textContent=m[k]+(x?' ('+x+')':'');$('sin').style.display=k==='out'?'':'none';$('sout').style.display=cloud.user?'':'none'}
+function schedulePush(){if(!cloud.ref)return;clearTimeout(pushTimer);pushTimer=setTimeout(()=>push(false),1500)}
+async function push(force){
+ if(!cloud.ref||pushing)return;if(!navigator.onLine){setStatus('offline');return}
+ pushing=true;setStatus('saving');const seq=editSeq,json=JSON.stringify(S),rev=uid(),ref=cloud.ref;let conflict=null;
+ try{await cloud.F.runTransaction(cloud.db,async tx=>{const s=await tx.get(ref);
+   if(!force&&s.exists()&&s.data().rev!==meta.synced){const c=new Error('conflict');c.remote=s.data();throw c}
+   tx.set(ref,{json,rev,at:Date.now()})});
+  meta.synced=rev;if(editSeq===seq)meta.dirty=false;saveMeta();setStatus('synced')}
+ catch(e){if(e&&e.remote)conflict=e.remote;else{setStatus(navigator.onLine?'error':'offline');clearTimeout(pushTimer);pushTimer=setTimeout(()=>push(false),15000)}}
+ pushing=false;if(conflict)reconcile(conflict);else if(meta.dirty&&editSeq!==seq)schedulePush()}
+function reconcile(r){
+ if(r.rev===meta.synced){if(meta.dirty)schedulePush();else setStatus('synced');return}
+ if(busy()||pushing){setTimeout(()=>reconcile(r),800);return}
+ if(r.json===JSON.stringify(S)){meta.synced=r.rev;meta.dirty=false;saveMeta();setStatus('synced');return}
+ if(isBlank(S)||(!meta.dirty&&meta.synced!=='')){applyRemote(r);return}
+ askConflict(r)}
+function applyRemote(r){let d;try{d=JSON.parse(r.json)}catch(e){}
+ if(!valid(d)){setStatus('error','cloud data invalid');return}
+ S=norm(d);persist();meta={synced:r.rev,dirty:false};saveMeta();render();setStatus('synced')}
+function askConflict(r){if(conflictOpen)return;conflictOpen=true;ov.style.display='flex';
+ modal.innerHTML=`<div><b>Two different versions of your board exist.</b></div><div>This device's copy and the cloud copy don't match${r.at?' (cloud copy saved '+new Date(r.at).toLocaleString()+')':''}. Choose which to keep. The other one is kept as a safety copy in this browser.</div><div class="row"><button class="btn" id="cu">Use cloud copy</button><button class="btn" id="kl">Keep this device's copy</button></div>`;
+ $('cu').onclick=()=>{try{localStorage.setItem(KEY+'-pre-cloud',JSON.stringify(S))}catch(e){}ov.style.display='none';modal.innerHTML='';conflictOpen=false;applyRemote(r)};
+ $('kl').onclick=()=>{try{localStorage.setItem(KEY+'-pre-local',r.json)}catch(e){}ov.style.display='none';modal.innerHTML='';conflictOpen=false;meta.dirty=true;saveMeta();push(true)}}
+async function initCloud(){
+ try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
+ if(!FB.apiKey){setStatus('local');return}
+ setStatus('out');
+ try{const b='https://www.gstatic.com/firebasejs/10.14.1/';
+  const[A,Au,F]=await Promise.all([import(b+'firebase-app.js'),import(b+'firebase-auth.js'),import(b+'firebase-firestore.js')]);
+  cloud.Au=Au;cloud.F=F;const app=A.initializeApp(FB);cloud.auth=Au.getAuth(app);cloud.db=F.getFirestore(app);
+  Au.onAuthStateChanged(cloud.auth,u=>{cloud.user=u;if(cloud.unsub){cloud.unsub();cloud.unsub=null}cloud.ref=null;
+   if(!u){setStatus('out');return}
+   cloud.ref=F.doc(cloud.db,'boards',u.uid);setStatus('saving');
+   cloud.unsub=F.onSnapshot(cloud.ref,s=>{if(s.metadata.hasPendingWrites)return;
+    if(!s.exists()){if(!isBlank(S)||meta.dirty)push(false);else setStatus('synced');return}
+    reconcile(s.data())},()=>setStatus('error'))});
+  $('sin').onclick=async()=>{const P=()=>new Au.GoogleAuthProvider();try{await Au.signInWithPopup(cloud.auth,P())}catch(e){const c=e&&e.code;
+    if(c==='auth/popup-blocked'||c==='auth/operation-not-supported-in-this-environment')Au.signInWithRedirect(cloud.auth,P());else if(c!=='auth/popup-closed-by-user'&&c!=='auth/cancelled-popup-request')setStatus('error',c)}};
+  $('sout').onclick=()=>Au.signOut(cloud.auth);
+  addEventListener('online',()=>{if(meta.dirty)push(false)});
+ }catch(e){setStatus('error','could not load Firebase')}}
+render();initCloud();
+</script>
+</body></html>
