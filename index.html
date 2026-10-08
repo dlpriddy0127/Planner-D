@@ -81,6 +81,12 @@ input,textarea,select{font:inherit;color:var(--text);background:var(--card);bord
 .pcol>.ph .dl{order:5;flex-basis:100%;padding-left:22px;font-size:13px}
 .lrow{flex-wrap:wrap}
 .lrow .pt{flex:1 1 110px;min-width:0}
+#toast{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);background:#1d2330;color:#fff;padding:8px 14px;border-radius:8px;z-index:80;display:none;gap:12px;align-items:center;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+#toast button{color:#9cc2ff;text-decoration:underline}
+.arcbar{margin:0 4px 4px;padding:6px;border-radius:6px;background:#dcfce7;color:#166534;border:1px solid #86efac;font-weight:600;text-align:center}
+.arow{display:flex;gap:8px;justify-content:space-between;align-items:flex-start;padding:6px 0;border-bottom:1px solid var(--line)}
+.ainfo{display:flex;flex-direction:column;gap:2px;min-width:0;overflow-wrap:anywhere}
+.aact{display:flex;gap:4px;flex:none}
 </style></head>
 <body>
 <div id="bar">
@@ -88,24 +94,25 @@ input,textarea,select{font:inherit;color:var(--text);background:var(--card);bord
  <input id="newproj" placeholder="+ New project (Enter)">
  <span style="flex:1"></span>
  <span id="sync" style="font-size:12.5px;color:var(--mut)"></span><button class="btn" id="sin" style="display:none">Sign in with Google</button><button class="btn" id="sout" style="display:none">Sign out</button>
+ <button class="btn" id="arch">Archive</button>
  <button class="btn" id="exp">Export Backup</button>
  <button class="btn" id="imp">Restore Backup</button>
  <input type="file" id="file" accept=".json,application/json" hidden>
 </div>
 <div id="note">Saved in this browser and, once you sign in, to your private cloud copy so all your devices stay in sync. Exporting a backup now and then is still a good extra.</div>
 <div id="board"></div>
-<div id="ind"></div><div id="menu"></div>
+<div id="toast"></div><div id="ind"></div><div id="menu"></div>
 <div id="ov"><div id="modal"></div></div>
+<script src="config.js"></script>
 <script>
-/* ====== PASTE YOUR FIREBASE WEB-APP CONFIG HERE (Project settings > Your apps) ====== */
-const FB={apiKey:"AIzaSyCi-YeyYSXgSXJFunOb5zBWP71RSuVCbjc",authDomain:"dylan-s-planner.firebaseapp.com",projectId:"dylan-s-planner",appId:"1:958797648742:web:d004fdcc8ae43ce3ddeea7"};
-/* ================================================================================= */
+const FB=window.FB_CONFIG||{}; /* your Firebase values live in config.js */
 const KEY='index-card-board-v1';
 const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-3);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let S=load(),meta=loadMeta();
-function blank(){return{active:[],later:[],unsorted:[]}}
-function norm(d){if(d.ongoing&&d.ongoing.length)d.active.push({id:uid(),title:'Ongoing Work',notes:'',deadline:'',tasks:d.ongoing});delete d.ongoing;return d}
+function blank(){return{active:[],later:[],unsorted:[],archive:{projects:[],tasks:[]}}}
+function norm(d){if(!d.archive)d.archive={projects:[],tasks:[]};{const keep=[];d.unsorted.forEach(t=>t.done?d.archive.tasks.unshift({...t,completedAt:Date.now()}):keep.push(t));d.unsorted=keep}
+ if(d.ongoing&&d.ongoing.length)d.active.push({id:uid(),title:'Ongoing Work',notes:'',deadline:'',tasks:d.ongoing});delete d.ongoing;return d}
 function load(){try{const r=localStorage.getItem(KEY);if(r){const d=JSON.parse(r);if(valid(d))return norm(d)}}catch(e){}return blank()}
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function loadMeta(){try{return JSON.parse(localStorage.getItem(KEY+'-meta'))||{synced:'',dirty:false}}catch(e){return{synced:'',dirty:false}}}
@@ -115,7 +122,9 @@ function save(){changed()}
 function vTask(t){return t&&typeof t==='object'&&typeof t.id==='string'&&typeof t.title==='string'&&typeof t.notes==='string'&&(t.deadline===''||/^\d{4}-\d{2}-\d{2}$/.test(t.deadline))&&typeof t.done==='boolean'&&typeof t.blocked==='boolean'}
 function vProj(p){return p&&typeof p==='object'&&typeof p.id==='string'&&typeof p.title==='string'&&typeof p.notes==='string'&&(p.deadline===''||/^\d{4}-\d{2}-\d{2}$/.test(p.deadline))&&Array.isArray(p.tasks)&&p.tasks.every(vTask)}
 function valid(d){if(!d||typeof d!=='object')return false;for(const k of['active','later'])if(!Array.isArray(d[k])||!d[k].every(vProj))return false;if(!Array.isArray(d.unsorted)||!d.unsorted.every(vTask))return false;if(d.ongoing!==undefined&&(!Array.isArray(d.ongoing)||!d.ongoing.every(vTask)))return false;
- const ids=[];[...d.active,...d.later].forEach(p=>{ids.push(p.id);p.tasks.forEach(t=>ids.push(t.id))});[...d.unsorted,...(d.ongoing||[])].forEach(t=>ids.push(t.id));return new Set(ids).size===ids.length}
+ if(d.archive!==undefined){const a=d.archive;if(!a||typeof a!=='object'||!Array.isArray(a.projects)||!a.projects.every(vProj)||!Array.isArray(a.tasks)||!a.tasks.every(vTask))return false}
+ const ids=[];[...d.active,...d.later].forEach(p=>{ids.push(p.id);p.tasks.forEach(t=>ids.push(t.id))});[...d.unsorted,...(d.ongoing||[])].forEach(t=>ids.push(t.id));if(d.archive){d.archive.projects.forEach(p=>{ids.push(p.id);p.tasks.forEach(t=>ids.push(t.id))});d.archive.tasks.forEach(t=>ids.push(t.id))}
+ return new Set(ids).size===ids.length}
 const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 const od=d=>d&&d<today();
 function fmt(d){const[y,m,dd]=d.split('-').map(Number);const o=new Date(y,m-1,dd);return o.toLocaleDateString(undefined,{month:'short',day:'numeric',...(y!==new Date().getFullYear()?{year:'numeric'}:{})})}
@@ -141,7 +150,7 @@ function colHTML(id,head,tasks,extra=''){
 function projHTML(p){
  const n=p.tasks.filter(t=>!t.done).length,over=od(p.deadline);
  return `<section class="col pcol" data-col="${p.id}" data-proj="${p.id}"><div class="ph${over?' od':''}"><span class="grip" data-pgrip title="Drag to reprioritize">⠿</span><span class="pt" data-act="open-p" data-id="${p.id}">${esc(p.title)}</span>${p.notes?'<span title="Has notes">📄</span>':''}${p.deadline?`<span class="dl ${over?'od':'fut'}">📅 ${fmt(p.deadline)}${over?' · OVERDUE':''}</span>`:''}<span class="cnt">${n}</span><button data-act="menu-p" data-id="${p.id}" title="More">⋯</button></div>
- <div class="tasks">${p.tasks.map(taskHTML).join('')}</div><input class="add" data-add="${p.id}" placeholder="+ Add task (Enter)"></section>`}
+ <div class="tasks">${p.tasks.map(taskHTML).join('')}</div>${p.tasks.length&&p.tasks.every(t=>t.done)?`<button class="arcbar" data-act="arc-p" data-id="${p.id}">✓ All tasks done - complete &amp; archive project</button>`:''}<input class="add" data-add="${p.id}" placeholder="+ Add task (Enter)"></section>`}
 function laterHTML(){
  return `<section class="col" id="later"><div class="ph"><span class="pt" style="cursor:default">Later Projects</span><span class="cnt">${S.later.length}</span></div><div class="tasks">${S.later.map(p=>{const n=p.tasks.filter(t=>!t.done).length,o=od(p.deadline);
  return `<div class="lrow${o?' od':''}" data-lrow="${p.id}"><span class="pt" data-act="open-p" data-id="${p.id}">${esc(p.title)}</span>${p.notes?'<span title="Has notes">📄</span>':''}${p.deadline?`<span class="dl ${o?'od':'fut'}">📅 ${fmt(p.deadline)}${o?' · OVERDUE':''}</span>`:''}<span class="cnt" title="Incomplete tasks">${n}</span><button class="btn" data-act="activate" data-id="${p.id}" title="Make active">▶ Activate</button></div>`}).join('')||'<div class="empty">Drag a project here to set it aside.</div>'}</div></section>`}
@@ -152,6 +161,7 @@ function render(){
  b.innerHTML=colHTML('unsorted','<div class="ph"><span class="pt" style="cursor:default">Unsorted Tasks</span><span class="cnt">'+S.unsorted.filter(t=>!t.done).length+'</span></div>',S.unsorted)
   +'<div id="projs">'+S.active.map(projHTML).join('')+'</div>'
   +laterHTML();
+ {const n=S.archive.projects.length+S.archive.tasks.length;document.getElementById('arch').textContent='Archive'+(n?' ('+n+')':'')}
  b.scrollLeft=sl;document.querySelectorAll('.tasks').forEach(e=>{const c=e.closest('[data-col],#later');const k=c&&(c.dataset.col||'later');if(k in st)e.scrollTop=st[k]});
  if(refocus){const i=document.querySelector(`[data-add="${refocus}"]`);if(i)i.focus();refocus=null}
 }
@@ -167,7 +177,8 @@ document.addEventListener('click',e=>{
  if(noClick)return;
  const m=document.getElementById('menu');if(!e.target.closest('#menu')&&!e.target.closest('[data-act^="menu"]'))m.style.display='none';
  const a=e.target.closest('[data-act]');if(!a)return;const id=a.dataset.id,act=a.dataset.act;
- if(act==='done'){const f=findTask(id);f.t.done=!f.t.done;commit()}
+ if(act==='done'){const f=findTask(id);if(f.col==='unsorted'&&!f.t.done)archiveTask(id);else{f.t.done=!f.t.done;commit()}}
+ else if(act==='arc-p')projArchiveFlow(id);
  else if(act==='block'){const f=findTask(id);f.t.blocked=!f.t.blocked;commit()}
  else if(act==='open-t')openTask(id);
  else if(act==='open-p')openProj(id);
@@ -180,7 +191,7 @@ function showMenu(items,a){const m=document.getElementById('menu');m.innerHTML=i
 const mi=(label,id,arg)=>`<button data-act="mv" data-id="${id}" data-arg="${arg}">${label}</button>`;
 function menuTask(id,a){const f=findTask(id);const it=[mi('↑ Move up',id,'up'),mi('↓ Move down',id,'down'),mi('Toggle waiting',id,'blk'),mi('Details…',id,'tdet'),'<div class="sep">Move to</div>'];
  if(f.col!=='unsorted')it.push(mi('Unsorted Tasks',id,'to|unsorted'));S.active.forEach(p=>{if(p.id!==f.col)it.push(mi(esc(p.title),id,'to|'+p.id))});showMenu(it,a)}
-function menuProj(id,a){showMenu([mi('← Move left',id,'left'),mi('→ Move right',id,'right'),mi('Move to Later',id,'later'),mi('Details…',id,'pdet')],a)}
+function menuProj(id,a){showMenu([mi('← Move left',id,'left'),mi('→ Move right',id,'right'),mi('Move to Later',id,'later'),mi('Complete & archive project',id,'parc'),mi('Details…',id,'pdet')],a)}
 function doMenu(k,id,arg){
  if(k==='up'||k==='down'){const f=findTask(id),j=f.i+(k==='up'?-1:1);if(j>=0&&j<f.l.length){[f.l[f.i],f.l[j]]=[f.l[j],f.l[f.i]]}}
  else if(k==='to')moveTask(id,arg,null);
@@ -189,6 +200,7 @@ function doMenu(k,id,arg){
  else if(k==='pdet')return openProj(id);
  else if(k==='left'||k==='right'){const i=S.active.findIndex(p=>p.id===id),j=i+(k==='left'?-1:1);if(j>=0&&j<S.active.length)[S.active[i],S.active[j]]=[S.active[j],S.active[i]]}
  else if(k==='later')toLater(id);
+ else if(k==='parc')return projArchiveFlow(id);
  commit()}
 
 /* ---------- modals ---------- */
@@ -196,21 +208,22 @@ const ov=document.getElementById('ov'),modal=document.getElementById('modal');
 function closeModal(){ov.style.display='none';modal.innerHTML='';conflictOpen=false;render()}
 ov.addEventListener('mousedown',e=>{if(e.target===ov)closeModal()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(drag)cancelDrag();else if(ov.style.display==='flex')closeModal();document.getElementById('menu').style.display='none'}});
-function ask(msg,label,cb,danger){ov.style.display='flex';modal.innerHTML=`<div>${esc(msg)}</div><div class="row"><button class="btn" id="mc">Cancel</button><button class="btn ${danger?'danger':''}" id="mo">${esc(label)}</button></div>`;document.getElementById('mc').onclick=closeModal;document.getElementById('mo').onclick=()=>{ov.style.display='none';modal.innerHTML='';cb()}}
+function ask(msg,label,cb,danger,onCancel){ov.style.display='flex';modal.innerHTML=`<div>${esc(msg)}</div><div class="row"><button class="btn" id="mc">Cancel</button><button class="btn ${danger?'danger':''}" id="mo">${esc(label)}</button></div>`;document.getElementById('mc').onclick=onCancel||closeModal;document.getElementById('mo').onclick=()=>{ov.style.display='none';modal.innerHTML='';cb()}}
 function bind(obj,fields){fields.forEach(([sel,key])=>{const el=modal.querySelector(sel);el.addEventListener('input',()=>{obj[key]=el.value;save()});el.addEventListener('change',()=>{obj[key]=el.value;save()})})}
 function openTask(id){const f=findTask(id);if(!f)return;const t=f.t;ov.style.display='flex';
  modal.innerHTML=`<div><label>Task title</label><input id="f1" value="${esc(t.title)}"></div><div><label>Notes</label><textarea id="f2">${esc(t.notes)}</textarea></div>
  <div class="row"><div style="flex:1"><label>Deadline</label><input type="date" id="f3" value="${t.deadline}"></div><div style="flex:1"><label>Status</label><select id="f4"><option value="open">Not complete</option><option value="blocked">Waiting / blocked</option><option value="done">Complete</option></select></div></div>
  <div class="row"><button class="btn danger" id="del">Delete task</button><button class="btn" id="cl">Done</button></div>`;
  bind(t,[['#f1','title'],['#f2','notes'],['#f3','deadline']]);const s=modal.querySelector('#f4');s.value=t.done?'done':t.blocked?'blocked':'open';
- s.onchange=()=>{t.done=s.value==='done';t.blocked=s.value==='blocked';save()};
+ s.onchange=()=>{if(s.value==='done'&&f.col==='unsorted'){archiveTask(id);ov.style.display='none';modal.innerHTML='';return}t.done=s.value==='done';t.blocked=s.value==='blocked';save()};
  modal.querySelector('#cl').onclick=closeModal;modal.querySelector('#del').onclick=()=>ask('Delete this task permanently?','Delete',()=>{const g=findTask(id);g.l.splice(g.i,1);commit()},1)}
 function openProj(id){const p=findProj(id);if(!p)return;const act=S.active.includes(p);ov.style.display='flex';
  modal.innerHTML=`<div><label>Project title</label><input id="f1" value="${esc(p.title)}"></div><div><label>Notes</label><textarea id="f2">${esc(p.notes)}</textarea></div>
  <div><label>Project deadline</label><input type="date" id="f3" value="${p.deadline}"></div>
- <div class="row"><button class="btn" id="mv">${act?'Move to Later Projects':'Make active'}</button><button class="btn danger" id="del">Delete project</button><button class="btn" id="cl">Done</button></div>`;
+ <div class="row"><button class="btn" id="mv">${act?'Move to Later Projects':'Make active'}</button><button class="btn" id="arc">Complete &amp; archive</button><button class="btn danger" id="del">Delete project</button><button class="btn" id="cl">Done</button></div>`;
  bind(p,[['#f1','title'],['#f2','notes'],['#f3','deadline']]);
  modal.querySelector('#cl').onclick=closeModal;
+ modal.querySelector('#arc').onclick=()=>{ov.style.display='none';modal.innerHTML='';projArchiveFlow(id)};
  modal.querySelector('#mv').onclick=()=>{act?toLater(id):moveProj(id,null);closeModal()};
  modal.querySelector('#del').onclick=()=>ask(`Delete "${p.title}" and its ${p.tasks.length} task(s) permanently?`,'Delete project',()=>{S.active=S.active.filter(x=>x!==p);S.later=S.later.filter(x=>x!==p);commit()},1)}
 
@@ -266,10 +279,33 @@ function update(){const d=drag;if(!d||!d.on)return;d.ghost.style.left=(d.x-d.ox)
  Object.assign(ind.style,{display:'block',left:x+'px',width:'3px',top:top+'px',height:h+'px'});d.tgt={idx}}
 function endDrag(){const d=drag;if(d.timer)clearInterval(d.timer);if(d.ghost)d.ghost.remove();d.el.classList.remove('dragging');document.body.classList.remove('dnd');ind.style.display='none';document.querySelectorAll('.over').forEach(x=>x.classList.remove('over'));drag=null}
 function cancelDrag(){if(drag.on)endDrag();else drag=null}
+/* ---------- archive ---------- */
+let toastT=null;
+function toast(msg,undo){const t=document.getElementById('toast');t.innerHTML=esc(msg)+(undo?' <button id="tu">Undo</button>':'');t.style.display='flex';clearTimeout(toastT);toastT=setTimeout(()=>t.style.display='none',8000);if(undo)document.getElementById('tu').onclick=()=>{t.style.display='none';undo()}}
+function archiveTask(id){const f=findTask(id);if(!f)return;const t=f.t,i=f.i;f.l.splice(i,1);t.done=true;t.completedAt=Date.now();S.archive.tasks.unshift(t);commit();
+ toast('Task archived','Undo',()=>{S.archive.tasks=S.archive.tasks.filter(x=>x!==t);t.done=false;delete t.completedAt;S.unsorted.splice(Math.min(i,S.unsorted.length),0,t);commit()})}
+function archiveProj(id){let list='active',i=S.active.findIndex(p=>p.id===id);if(i<0){list='later';i=S.later.findIndex(p=>p.id===id)}if(i<0)return;
+ const p=S[list].splice(i,1)[0];p.completedAt=Date.now();S.archive.projects.unshift(p);commit();
+ toast('Project archived','Undo',()=>{S.archive.projects=S.archive.projects.filter(x=>x!==p);delete p.completedAt;S[list].splice(Math.min(i,S[list].length),0,p);commit()})}
+function projArchiveFlow(id){const p=findProj(id);if(!p)return;const n=p.tasks.filter(t=>!t.done).length;
+ if(n)ask(`"${p.title}" still has ${n} incomplete task${n===1?'':'s'}. Archive it anyway?`,'Archive project',()=>archiveProj(id));else archiveProj(id)}
+function openArchive(){const A=S.archive;ov.style.display='flex';
+ const dt=x=>x?' · completed '+new Date(x).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}):'';
+ const prow=p=>`<div class="arow"><div class="ainfo"><b>${esc(p.title)}</b><span class="meta">${p.tasks.length} task${p.tasks.length===1?'':'s'}${dt(p.completedAt)}</span>${p.tasks.length?`<details><summary class="meta">Show tasks</summary>${p.tasks.map(t=>`<div class="meta">${t.done?'✓':'○'} ${esc(t.title)}</div>`).join('')}</details>`:''}</div><div class="aact"><button class="btn" data-ar="rp" data-id="${p.id}">Restore</button><button class="btn danger" data-ar="dp" data-id="${p.id}">Delete</button></div></div>`;
+ const trow=t=>`<div class="arow"><div class="ainfo"><span>${esc(t.title)}</span><span class="meta">${dt(t.completedAt).replace(' · ','')}</span></div><div class="aact"><button class="btn" data-ar="rt" data-id="${t.id}">Restore</button><button class="btn danger" data-ar="dt" data-id="${t.id}">Delete</button></div></div>`;
+ modal.innerHTML=`<div class="row"><b style="font-size:17px">Archive</b><button class="btn" id="cl">Close</button></div><div class="meta">Completed projects and completed unsorted tasks. Nothing is lost until you delete it here.</div><div><b>Projects (${A.projects.length})</b>${A.projects.map(prow).join('')||'<div class="empty">None yet.</div>'}</div><div><b>Unsorted tasks (${A.tasks.length})</b>${A.tasks.map(trow).join('')||'<div class="empty">None yet.</div>'}</div>`;
+ modal.querySelector('#cl').onclick=closeModal;
+ modal.onclick=e=>{const b=e.target.closest('[data-ar]');if(!b)return;const id=b.dataset.id,k=b.dataset.ar;
+  if(k==='rp'){const p=A.projects.find(x=>x.id===id);A.projects=A.projects.filter(x=>x!==p);delete p.completedAt;S.active.push(p);commit();openArchive()}
+  else if(k==='rt'){const t=A.tasks.find(x=>x.id===id);A.tasks=A.tasks.filter(x=>x!==t);delete t.completedAt;t.done=false;S.unsorted.push(t);commit();openArchive()}
+  else if(k==='dp'){const p=A.projects.find(x=>x.id===id);ask(`Permanently delete "${p.title}" and its ${p.tasks.length} task(s)?`,'Delete',()=>{A.projects=A.projects.filter(x=>x!==p);commit();openArchive()},1,openArchive)}
+  else if(k==='dt'){const t=A.tasks.find(x=>x.id===id);ask(`Permanently delete "${t.title}"?`,'Delete',()=>{A.tasks=A.tasks.filter(x=>x!==t);commit();openArchive()},1,openArchive)}}}
+document.getElementById('arch').onclick=openArchive;
+
 /* ---------- cloud sync (Firebase Auth + Firestore) ---------- */
 const $=id=>document.getElementById(id);
 let cloud={},pushing=false,pushTimer=null,editSeq=0,conflictOpen=false;
-const isBlank=d=>!d.active.length&&!d.later.length&&!d.unsorted.length;
+const isBlank=d=>!d.active.length&&!d.later.length&&!d.unsorted.length&&!(d.archive&&(d.archive.projects.length||d.archive.tasks.length));
 const busy=()=>(drag&&drag.on)||ov.style.display==='flex';
 function setStatus(k,x){const m={local:'Saved on this device only (cloud not set up)',out:'Not signed in - saved on this device only',saving:'☁ Saving…',synced:'☁ Synced '+new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}),offline:'Offline - will sync when back online',error:'Sync problem - will retry'};
  $('sync').textContent=m[k]+(x?' ('+x+')':'');$('sin').style.display=k==='out'?'':'none';$('sout').style.display=cloud.user?'':'none'}
