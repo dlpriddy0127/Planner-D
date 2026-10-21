@@ -19,13 +19,15 @@ input,textarea,select{font:inherit;color:var(--text);background:var(--card);bord
 .btn:hover{border-color:var(--acc)}
 .btn.danger{color:var(--redt)}
 #note{font-size:12.5px;color:var(--mut);padding:2px 10px;background:var(--col);border-bottom:1px solid var(--line)}
-#board{flex:1;min-height:0;display:flex;gap:8px;padding:8px;overflow-x:auto;align-items:flex-start}
+#board{position:absolute;inset:0;display:flex;gap:8px;padding:8px;overflow-x:auto;align-items:flex-start}
 #projs{display:flex;gap:8px;align-items:flex-start;max-height:100%;min-width:12px}
 .col{width:272px;flex:none;max-height:100%;display:flex;flex-direction:column;background:var(--col);border:1px solid var(--line);border-radius:8px}
 #unsorted{position:sticky;left:0;z-index:5;box-shadow:6px 0 8px -6px rgba(0,0,0,.25)}
 #ongoing{border-style:dashed}
-#later{width:285px;position:sticky;right:8px;z-index:5;margin-left:auto;box-shadow:-6px 0 8px -6px rgba(0,0,0,.25)}
-@media(max-width:800px){#later{position:static;margin-left:0;box-shadow:none}}
+#later{width:285px}
+#wrap{flex:1;min-height:0;position:relative}
+#laterbox{position:absolute;right:8px;top:8px;bottom:22px;z-index:5;pointer-events:none}
+#laterbox #later{pointer-events:auto;box-shadow:-6px 0 8px -6px rgba(0,0,0,.25)}
 .col.over{outline:2px solid var(--acc)}
 .pcol>.ph{cursor:grab}
 .ph{display:flex;align-items:center;gap:6px;padding:8px 9px;border-bottom:1px solid var(--line);border-radius:8px 8px 0 0}
@@ -101,7 +103,7 @@ input,textarea,select{font:inherit;color:var(--text);background:var(--card);bord
  <input type="file" id="file" accept=".json,application/json" hidden>
 </div>
 <div id="note">Saved in this browser and, once you sign in, to your private cloud copy so all your devices stay in sync. Exporting a backup now and then is still a good extra.</div>
-<div id="board"></div>
+<div id="wrap"><div id="board"></div><div id="laterbox"></div></div>
 <div id="toast"></div><div id="ind"></div><div id="menu"></div>
 <div id="ov"><div id="modal"></div></div>
 <script src="config.js"></script>
@@ -111,6 +113,7 @@ const KEY='index-card-board-v1';
 const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-3);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let S=load(),meta=loadMeta();
+const NARROW=window.matchMedia('(max-width:800px)');NARROW.addEventListener('change',()=>render());
 function blank(){return{active:[],later:[],unsorted:[],archive:{projects:[],tasks:[]}}}
 function norm(d){if(!d.archive)d.archive={projects:[],tasks:[]};{const keep=[];d.unsorted.forEach(t=>t.done?d.archive.tasks.unshift({...t,completedAt:Date.now()}):keep.push(t));d.unsorted=keep}
  if(d.ongoing&&d.ongoing.length)d.active.push({id:uid(),title:'Ongoing Work',notes:'',deadline:'',tasks:d.ongoing});delete d.ongoing;return d}
@@ -161,7 +164,8 @@ function render(){
  const st={};document.querySelectorAll('.tasks').forEach(e=>{const c=e.closest('[data-col],#later');if(c)st[c.dataset.col||'later']=e.scrollTop});
  b.innerHTML=colHTML('unsorted','<div class="ph"><span class="pt" style="cursor:default">Unsorted Tasks</span><span class="cnt">'+S.unsorted.filter(t=>!t.done).length+'</span></div>',S.unsorted)
   +'<div id="projs">'+S.active.map(projHTML).join('')+'</div>'
-  +laterHTML();
+  +(NARROW.matches?laterHTML():'<div style="flex:none;width:293px;height:1px"></div>');
+ document.getElementById('laterbox').innerHTML=NARROW.matches?'':laterHTML();
  {const n=S.archive.projects.length+S.archive.tasks.length;document.getElementById('arch').textContent='Archive'+(n?' ('+n+')':'')}
  b.scrollLeft=sl;document.querySelectorAll('.tasks').forEach(e=>{const c=e.closest('[data-col],#later');const k=c&&(c.dataset.col||'later');if(k in st)e.scrollTop=st[k]});
  if(refocus){const i=document.querySelector(`[data-add="${refocus}"]`);if(i)i.focus();refocus=null}
