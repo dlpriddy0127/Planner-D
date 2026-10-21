@@ -24,7 +24,8 @@ input,textarea,select{font:inherit;color:var(--text);background:var(--card);bord
 .col{width:272px;flex:none;max-height:100%;display:flex;flex-direction:column;background:var(--col);border:1px solid var(--line);border-radius:8px}
 #unsorted{position:sticky;left:0;z-index:5;box-shadow:6px 0 8px -6px rgba(0,0,0,.25)}
 #ongoing{border-style:dashed}
-#later{width:285px}
+#later{width:285px;position:sticky;right:8px;z-index:5;margin-left:auto;box-shadow:-6px 0 8px -6px rgba(0,0,0,.25)}
+@media(max-width:800px){#later{position:static;margin-left:0;box-shadow:none}}
 .col.over{outline:2px solid var(--acc)}
 .pcol>.ph{cursor:grab}
 .ph{display:flex;align-items:center;gap:6px;padding:8px 9px;border-bottom:1px solid var(--line);border-radius:8px 8px 0 0}
@@ -169,7 +170,7 @@ const commit=()=>{render();changed()};
 
 /* ---------- add ---------- */
 document.getElementById('newproj').addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.value.trim()){S.active.push({id:uid(),title:e.target.value.trim(),notes:'',deadline:'',tasks:[]});e.target.value='';commit();const b=document.getElementById('board');b.scrollLeft=b.scrollWidth}});
-document.addEventListener('keydown',e=>{const c=e.target.dataset&&e.target.dataset.add;if(c&&e.key==='Enter'&&!e.isComposing&&e.target.value.trim()){const l=listOf(c);if(l){l.push(mkTask(e.target.value.trim()));refocus=c;commit();const t=document.querySelector(`[data-col="${c}"] .tasks`);if(t)t.scrollTop=t.scrollHeight}}});
+document.addEventListener('keydown',e=>{const c=e.target.dataset&&e.target.dataset.add;if(c&&e.key==='Enter'&&!e.isComposing&&e.target.value.trim()){const l=listOf(c);if(l){l.unshift(mkTask(e.target.value.trim()));refocus=c;commit();const t=document.querySelector(`[data-col="${c}"] .tasks`);if(t)t.scrollTop=0}}});
 
 /* ---------- clicks ---------- */
 let noClick=false;
@@ -189,11 +190,11 @@ document.addEventListener('click',e=>{
 });
 function showMenu(items,a){const m=document.getElementById('menu');m.innerHTML=items.join('');m.style.display='block';const r=a.getBoundingClientRect();m.style.left=Math.max(4,Math.min(r.left,innerWidth-m.offsetWidth-4))+'px';m.style.top=Math.max(4,Math.min(r.bottom+2,innerHeight-m.offsetHeight-4))+'px'}
 const mi=(label,id,arg)=>`<button data-act="mv" data-id="${id}" data-arg="${arg}">${label}</button>`;
-function menuTask(id,a){const f=findTask(id);const it=[mi('↑ Move up',id,'up'),mi('↓ Move down',id,'down'),mi('Toggle waiting',id,'blk'),mi('Details…',id,'tdet'),'<div class="sep">Move to</div>'];
+function menuTask(id,a){const f=findTask(id);const it=[mi('⤒ Move to top',id,'top'),mi('⤓ Move to bottom',id,'bottom'),mi('Toggle waiting',id,'blk'),mi('Details…',id,'tdet'),'<div class="sep">Move to</div>'];
  if(f.col!=='unsorted')it.push(mi('Unsorted Tasks',id,'to|unsorted'));S.active.forEach(p=>{if(p.id!==f.col)it.push(mi(esc(p.title),id,'to|'+p.id))});showMenu(it,a)}
 function menuProj(id,a){showMenu([mi('← Move left',id,'left'),mi('→ Move right',id,'right'),mi('Move to Later',id,'later'),mi('Complete & archive project',id,'parc'),mi('Details…',id,'pdet')],a)}
 function doMenu(k,id,arg){
- if(k==='up'||k==='down'){const f=findTask(id),j=f.i+(k==='up'?-1:1);if(j>=0&&j<f.l.length){[f.l[f.i],f.l[j]]=[f.l[j],f.l[f.i]]}}
+ if(k==='top'||k==='bottom'){const f=findTask(id);if(f)moveTask(id,f.col,k==='top'?0:null)}
  else if(k==='to')moveTask(id,arg,null);
  else if(k==='blk'){const f=findTask(id);f.t.blocked=!f.t.blocked}
  else if(k==='tdet')return openTask(id);
@@ -259,7 +260,9 @@ function startDrag(){const d=drag;d.on=true;const r=d.el.getBoundingClientRect()
  d.el.classList.add('dragging');document.body.classList.add('dnd');document.getElementById('menu').style.display='none';
  d.timer=setInterval(()=>{autoscroll();update()},30)}
 function autoscroll(){const b=document.getElementById('board'),r=b.getBoundingClientRect(),d=drag;
- if(d.x<r.left+50)b.scrollLeft-=14;else if(d.x>r.right-50)b.scrollLeft+=14;
+ const ur=document.getElementById('unsorted').getBoundingClientRect(),la=document.getElementById('later').getBoundingClientRect();
+ let lo=Math.max(r.left,ur.right),hi=Math.min(r.right,la.left);if(hi-lo<150){lo=r.left;hi=r.right}
+ if(d.x<lo+50&&d.x>=lo)b.scrollLeft-=14;else if(d.x>hi-50&&d.x<=hi)b.scrollLeft+=14;
  if(d.kind==='task'&&d.tgt){const l=document.querySelector(`[data-col="${d.tgt.col}"] .tasks`);if(l){const lr=l.getBoundingClientRect();if(d.y<lr.top+24)l.scrollTop-=10;else if(d.y>lr.bottom-24)l.scrollTop+=10}}}
 function update(){const d=drag;if(!d||!d.on)return;d.ghost.style.left=(d.x-d.ox)+'px';d.ghost.style.top=(d.y-d.oy)+'px';
  document.querySelectorAll('.over').forEach(x=>x.classList.remove('over'));d.tgt=null;ind.style.display='none';
