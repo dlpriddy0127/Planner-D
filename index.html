@@ -48,13 +48,14 @@ input,textarea,select{font:inherit;color:var(--text);background:var(--card);bord
 .dl.od{color:var(--redt);font-weight:700}
 .acts{display:flex;gap:1px;align-items:center}
 .acts button{opacity:.9;padding:1px 3px;border-radius:4px}
-.acts .wait{opacity:0}
-.task:hover .wait,.acts .wait:focus-visible{opacity:.45}
-.acts .wait.on{opacity:1}
+.acts .wait,.acts .sun{opacity:0}
+.task:hover .wait,.acts .wait:focus-visible,.task:hover .sun,.acts .sun:focus-visible{opacity:.45}
+.acts .wait.on,.acts .sun.on{opacity:1}
+@media(hover:none){.acts .wait,.acts .sun{opacity:.45}.acts .wait.on,.acts .sun.on{opacity:1}}
 .acts button:hover{background:rgba(127,127,127,.2)}
 .dragging{opacity:.35}
-#ghost{position:fixed;z-index:50;pointer-events:none;opacity:.92;box-shadow:0 6px 18px rgba(0,0,0,.35);transform:rotate(1.5deg)}
-#ind{position:fixed;z-index:40;pointer-events:none;background:var(--acc);display:none;border-radius:2px}
+#ghost{position:fixed;z-index:58;pointer-events:none;opacity:.92;box-shadow:0 6px 18px rgba(0,0,0,.35);transform:rotate(1.5deg)}
+#ind{position:fixed;z-index:57;pointer-events:none;background:var(--acc);display:none;border-radius:2px}
 .add{margin:0 4px 4px;width:calc(100% - 8px)}
 .lrow{display:flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:5px;padding:6px 8px;cursor:grab}
 .lrow.od{background:var(--red);border-color:var(--redt)}
@@ -90,10 +91,30 @@ input,textarea,select{font:inherit;color:var(--text);background:var(--card);bord
 .arow{display:flex;gap:8px;justify-content:space-between;align-items:flex-start;padding:6px 0;border-bottom:1px solid var(--line)}
 .ainfo{display:flex;flex-direction:column;gap:2px;min-width:0;overflow-wrap:anywhere}
 .aact{display:flex;gap:4px;flex:none}
+.task .meta{overflow:hidden}
+.btn.pri{background:#fff4d6;border-color:#f59e0b;font-weight:600}
+.btn.pri.open{background:#fde68a}
+#today{position:absolute;inset:0;z-index:55;background:rgba(20,25,35,.38);display:none;justify-content:center;align-items:flex-start;padding:14px}
+#tpanel{width:min(600px,100%);max-height:100%;display:flex;flex-direction:column;background:var(--col);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.35);overflow:hidden}
+#thead{padding:12px 14px 8px;border-bottom:2px solid #f59e0b;background:#fff4d6;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+#thead h2{margin:0;font-size:21px;font-weight:750;color:#78350f;flex:1}
+#thead .cnt{color:#78350f;font-weight:600}
+.tsub{font-size:12.5px;color:var(--mut);padding:6px 14px 0}
+#tadd{margin:8px 14px;width:calc(100% - 28px)}
+#tbody{overflow-y:auto;padding:0 10px 12px;flex:1;min-height:60px}
+#tlist{display:flex;flex-direction:column;gap:3px;min-height:34px;padding:2px 4px}
+.task.trow{height:auto;min-height:56px}
+.psec{font-size:12px;font-weight:700;color:var(--mut);padding:10px 2px 2px}
+.prow{display:flex;gap:8px;align-items:center;padding:4px 2px;border-bottom:1px solid var(--line)}
+.prow .pt2{flex:1;min-width:0;overflow-wrap:anywhere}
+.pick{margin:6px 4px 0}
+.task.intoday{border-left:3px solid #f59e0b}
+@media(max-width:800px){#today{padding:0}#tpanel{width:100%;height:100%;max-height:100%;border-radius:0}}
 </style></head>
 <body>
 <div id="bar">
  <h1>Board</h1>
+ <button class="btn pri" id="tbtn" title="Open or close Today's List (press T)">☀ Today</button>
  <input id="newproj" placeholder="+ New project (Enter)">
  <span style="flex:1"></span>
  <span id="sync" style="font-size:12.5px;color:var(--mut)"></span><button class="btn" id="sin" style="display:none">Sign in with Google</button><button class="btn" id="sout" style="display:none">Sign out</button>
@@ -103,7 +124,7 @@ input,textarea,select{font:inherit;color:var(--text);background:var(--card);bord
  <input type="file" id="file" accept=".json,application/json" hidden>
 </div>
 <div id="note">Saved in this browser and, once you sign in, to your private cloud copy so all your devices stay in sync. Exporting a backup now and then is still a good extra.</div>
-<div id="wrap"><div id="board"></div><div id="laterbox"></div></div>
+<div id="wrap"><div id="board"></div><div id="laterbox"></div><div id="today"></div></div>
 <div id="toast"></div><div id="ind"></div><div id="menu"></div>
 <div id="ov"><div id="modal"></div></div>
 <script src="config.js"></script>
@@ -114,9 +135,10 @@ const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).sli
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let S=load(),meta=loadMeta();
 const NARROW=window.matchMedia('(max-width:800px)');NARROW.addEventListener('change',()=>render());
-function blank(){return{active:[],later:[],unsorted:[],archive:{projects:[],tasks:[]}}}
-function norm(d){if(!d.archive)d.archive={projects:[],tasks:[]};{const keep=[];d.unsorted.forEach(t=>t.done?d.archive.tasks.unshift({...t,completedAt:Date.now()}):keep.push(t));d.unsorted=keep}
- if(d.ongoing&&d.ongoing.length)d.active.push({id:uid(),title:'Ongoing Work',notes:'',deadline:'',tasks:d.ongoing});delete d.ongoing;return d}
+function blank(){return{active:[],later:[],unsorted:[],archive:{projects:[],tasks:[]},today:[],todayReset:'',todayAdded:{}}}
+function norm(d){if(!d.archive)d.archive={projects:[],tasks:[]};if(!Array.isArray(d.today))d.today=[];if(typeof d.todayReset!=='string')d.todayReset='';
+ {const ts=new Set(d.today),keep=[];d.unsorted.forEach(t=>t.done&&!ts.has(t.id)?d.archive.tasks.unshift({...t,completedAt:Date.now()}):keep.push(t));d.unsorted=keep}
+ if(d.ongoing&&d.ongoing.length)d.active.push({id:uid(),title:'Ongoing Work',notes:'',deadline:'',tasks:d.ongoing});delete d.ongoing;pruneToday(d);return d}
 function load(){try{const r=localStorage.getItem(KEY);if(r){const d=JSON.parse(r);if(valid(d))return norm(d)}}catch(e){}return blank()}
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function loadMeta(){try{return JSON.parse(localStorage.getItem(KEY+'-meta'))||{synced:'',dirty:false}}catch(e){return{synced:'',dirty:false}}}
@@ -126,6 +148,7 @@ function save(){changed()}
 function vTask(t){return t&&typeof t==='object'&&typeof t.id==='string'&&typeof t.title==='string'&&typeof t.notes==='string'&&(t.deadline===''||/^\d{4}-\d{2}-\d{2}$/.test(t.deadline))&&typeof t.done==='boolean'&&typeof t.blocked==='boolean'}
 function vProj(p){return p&&typeof p==='object'&&typeof p.id==='string'&&typeof p.title==='string'&&typeof p.notes==='string'&&(p.deadline===''||/^\d{4}-\d{2}-\d{2}$/.test(p.deadline))&&Array.isArray(p.tasks)&&p.tasks.every(vTask)}
 function valid(d){if(!d||typeof d!=='object')return false;for(const k of['active','later'])if(!Array.isArray(d[k])||!d[k].every(vProj))return false;if(!Array.isArray(d.unsorted)||!d.unsorted.every(vTask))return false;if(d.ongoing!==undefined&&(!Array.isArray(d.ongoing)||!d.ongoing.every(vTask)))return false;
+ if(d.today!==undefined&&(!Array.isArray(d.today)||!d.today.every(x=>typeof x==='string')))return false;if(d.todayReset!==undefined&&typeof d.todayReset!=='string')return false;if(d.todayAdded!==undefined&&(!d.todayAdded||typeof d.todayAdded!=='object'||Array.isArray(d.todayAdded)))return false;
  if(d.archive!==undefined){const a=d.archive;if(!a||typeof a!=='object'||!Array.isArray(a.projects)||!a.projects.every(vProj)||!Array.isArray(a.tasks)||!a.tasks.every(vTask))return false}
  const ids=[];[...d.active,...d.later].forEach(p=>{ids.push(p.id);p.tasks.forEach(t=>ids.push(t.id))});[...d.unsorted,...(d.ongoing||[])].forEach(t=>ids.push(t.id));if(d.archive){d.archive.projects.forEach(p=>{ids.push(p.id);p.tasks.forEach(t=>ids.push(t.id))});d.archive.tasks.forEach(t=>ids.push(t.id))}
  return new Set(ids).size===ids.length}
@@ -137,24 +160,26 @@ const allProjs=()=>[...S.active,...S.later];
 const findProj=id=>allProjs().find(p=>p.id===id);
 function listOf(col){return col==='unsorted'?S.unsorted:(S.active.find(p=>p.id===col)||{}).tasks}
 function findTask(id){for(const col of['unsorted',...allProjs().map(p=>p.id)]){const l=col==='unsorted'?S.unsorted:findProj(col).tasks;const i=l.findIndex(t=>t.id===id);if(i>=0)return{l,i,t:l[i],col}}return null}
-function moveTask(id,col,idx){const f=findTask(id);if(!f)return;const dest=listOf(col);if(!dest)return;f.l.splice(f.i,1);if(idx==null||idx>dest.length)idx=dest.length;dest.splice(idx,0,f.t)}
+function moveTask(id,col,idx){const f=findTask(id);if(!f)return;const dest=listOf(col);if(!dest)return;f.l.splice(f.i,1);if(dest===S.unsorted&&idx!=null){const vis=dest.filter(t=>!t.done);idx=idx>=vis.length?dest.length:dest.indexOf(vis[idx])}
+ if(idx==null||idx>dest.length)idx=dest.length;dest.splice(idx,0,f.t)}
 function moveProj(id,idx){/* idx among active excluding the moved one; moves to active */
  let p=S.active.find(x=>x.id===id);if(p)S.active=S.active.filter(x=>x!==p);else{p=S.later.find(x=>x.id===id);S.later=S.later.filter(x=>x!==p)}
  if(!p)return;if(idx==null||idx>S.active.length)idx=S.active.length;S.active.splice(idx,0,p)}
 function toLater(id){const p=S.active.find(x=>x.id===id);if(!p)return;S.active=S.active.filter(x=>x!==p);S.later.push(p)}
 
 /* ---------- render ---------- */
-function taskHTML(t){
- const over=!t.done&&od(t.deadline),cls=(t.done?' done':'')+(t.blocked&&!t.done?' blocked':'')+(over?' overdue':'');
+function taskHTML(t,x){
+ const on=inToday(t.id),over=!t.done&&od(t.deadline),cls=(t.done?' done':'')+(t.blocked&&!t.done?' blocked':'')+(over?' overdue':'')+(x?' trow':on?' intoday':'');
+ const parts=[];if(x&&x.tag)parts.push(`<span>${esc(x.tag)}</span>`);if(t.deadline)parts.push(`<span class="dl ${over?'od':'fut'}">📅 ${fmt(t.deadline)}${over?' · OVERDUE':''}</span>`);if(x&&x.carry>0)parts.push(`<span>↻ carried over ${x.carry}d</span>`);
  return `<div class="task${cls}" data-task="${t.id}"><button class="chk" data-act="done" data-id="${t.id}" title="Complete">${t.done?'✓':''}</button>
- <div><div class="tt" data-act="open-t" data-id="${t.id}" title="${esc(t.title)}">${esc(t.title)}</div>${t.deadline?`<div class="meta"><span class="dl ${over?'od':'fut'}">📅 ${fmt(t.deadline)}${over?' · OVERDUE':''}</span></div>`:''}</div>
- <div class="acts">${t.notes?'<span title="Has notes">📄</span>':''}<button class="wait${t.blocked?' on':''}" data-act="block" data-id="${t.id}" title="Waiting / blocked">⏳</button><button data-act="menu-t" data-id="${t.id}" title="Move / more">⋯</button></div></div>`}
+ <div><div class="tt" data-act="open-t" data-id="${t.id}" title="${esc(t.title)}">${esc(t.title)}</div>${parts.length?`<div class="meta">${parts.join('')}</div>`:''}</div>
+ <div class="acts">${t.notes?'<span title="Has notes">📄</span>':''}<button class="wait${t.blocked?' on':''}" data-act="block" data-id="${t.id}" title="Waiting / blocked">⏳</button><button class="sun${on?' on':''}" data-act="today" data-id="${t.id}" title="${on?(x?'Send back to the board (remove from Today\'s List)':'On Today\'s List - click to remove'):'Send to Today\'s List'}">${x?'↩':'☀'}</button><button data-act="menu-t" data-id="${t.id}" title="Move / more">⋯</button></div></div>`}
 function colHTML(id,head,tasks,extra=''){
- return `<section class="col" id="${id==='unsorted'?id:''}" data-col="${id}">${head}<div class="tasks">${tasks.map(taskHTML).join('')}</div><input class="add" data-add="${id}" placeholder="+ Add task (Enter)"></section>`}
+ return `<section class="col" id="${id==='unsorted'?id:''}" data-col="${id}">${head}<div class="tasks">${tasks.map(t=>taskHTML(t)).join('')}</div><input class="add" data-add="${id}" placeholder="+ Add task (Enter)"></section>`}
 function projHTML(p){
  const n=p.tasks.filter(t=>!t.done).length,over=od(p.deadline);
  return `<section class="col pcol" data-col="${p.id}" data-proj="${p.id}"><div class="ph${over?' od':''}"><span class="grip" data-pgrip title="Drag to reprioritize">⠿</span><span class="pt" data-act="open-p" data-id="${p.id}">${esc(p.title)}</span>${p.notes?'<span title="Has notes">📄</span>':''}${p.deadline?`<span class="dl ${over?'od':'fut'}">📅 ${fmt(p.deadline)}${over?' · OVERDUE':''}</span>`:''}<span class="cnt">${n}</span><button data-act="menu-p" data-id="${p.id}" title="More">⋯</button></div>
- <div class="tasks">${p.tasks.map(taskHTML).join('')}</div>${p.tasks.length&&p.tasks.every(t=>t.done)?`<button class="arcbar" data-act="arc-p" data-id="${p.id}">✓ All tasks done - complete &amp; archive project</button>`:''}<input class="add" data-add="${p.id}" placeholder="+ Add task (Enter)"></section>`}
+ <div class="tasks">${p.tasks.map(t=>taskHTML(t)).join('')}</div>${p.tasks.length&&p.tasks.every(t=>t.done)?`<button class="arcbar" data-act="arc-p" data-id="${p.id}">✓ All tasks done - complete &amp; archive project</button>`:''}<input class="add" data-add="${p.id}" placeholder="+ Add task (Enter)"></section>`}
 function laterHTML(){
  return `<section class="col" id="later"><div class="ph"><span class="pt" style="cursor:default">Later Projects</span><span class="cnt">${S.later.length}</span></div><div class="tasks">${S.later.map(p=>{const n=p.tasks.filter(t=>!t.done).length,o=od(p.deadline);
  return `<div class="lrow${o?' od':''}" data-lrow="${p.id}"><span class="pt" data-act="open-p" data-id="${p.id}">${esc(p.title)}</span>${p.notes?'<span title="Has notes">📄</span>':''}${p.deadline?`<span class="dl ${o?'od':'fut'}">📅 ${fmt(p.deadline)}${o?' · OVERDUE':''}</span>`:''}<span class="cnt" title="Incomplete tasks">${n}</span><button class="btn" data-act="activate" data-id="${p.id}" title="Make active">▶ Activate</button></div>`}).join('')||'<div class="empty">Drag a project here to set it aside.</div>'}</div></section>`}
@@ -162,15 +187,16 @@ let refocus=null;
 function render(){
  const b=document.getElementById('board'),sl=b.scrollLeft;
  const st={};document.querySelectorAll('.tasks').forEach(e=>{const c=e.closest('[data-col],#later');if(c)st[c.dataset.col||'later']=e.scrollTop});
- b.innerHTML=colHTML('unsorted','<div class="ph"><span class="pt" style="cursor:default">Unsorted Tasks</span><span class="cnt">'+S.unsorted.filter(t=>!t.done).length+'</span></div>',S.unsorted)
+ b.innerHTML=colHTML('unsorted','<div class="ph"><span class="pt" style="cursor:default">Unsorted Tasks</span><span class="cnt">'+S.unsorted.filter(t=>!t.done).length+'</span></div>',S.unsorted.filter(t=>!t.done))
   +'<div id="projs">'+S.active.map(projHTML).join('')+'</div>'
   +(NARROW.matches?laterHTML():'<div style="flex:none;width:293px;height:1px"></div>');
  document.getElementById('laterbox').innerHTML=NARROW.matches?'':laterHTML();
  {const n=S.archive.projects.length+S.archive.tasks.length;document.getElementById('arch').textContent='Archive'+(n?' ('+n+')':'')}
+ renderToday();
  b.scrollLeft=sl;document.querySelectorAll('.tasks').forEach(e=>{const c=e.closest('[data-col],#later');const k=c&&(c.dataset.col||'later');if(k in st)e.scrollTop=st[k]});
  if(refocus){const i=document.querySelector(`[data-add="${refocus}"]`);if(i)i.focus();refocus=null}
 }
-const commit=()=>{render();changed()};
+const commit=()=>{pruneToday(S);render();changed()};
 
 /* ---------- add ---------- */
 document.getElementById('newproj').addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.value.trim()){S.active.push({id:uid(),title:e.target.value.trim(),notes:'',deadline:'',tasks:[]});e.target.value='';commit();const b=document.getElementById('board');b.scrollLeft=b.scrollWidth}});
@@ -182,7 +208,10 @@ document.addEventListener('click',e=>{
  if(noClick)return;
  const m=document.getElementById('menu');if(!e.target.closest('#menu')&&!e.target.closest('[data-act^="menu"]'))m.style.display='none';
  const a=e.target.closest('[data-act]');if(!a)return;const id=a.dataset.id,act=a.dataset.act;
- if(act==='done'){const f=findTask(id);if(f.col==='unsorted'&&!f.t.done)archiveTask(id);else{f.t.done=!f.t.done;commit()}}
+ if(act==='done'){const f=findTask(id);if(f.col==='unsorted'&&!f.t.done&&!inToday(id))archiveTask(id);else{f.t.done=!f.t.done;commit();if(f.col==='unsorted'&&f.t.done)toast('Done. It stays on Today\'s List and moves to the Archive at the next daily reset.')}}
+ else if(act==='today')toggleToday(id);
+ else if(act==='tpick'){todayPick=!todayPick;renderToday()}
+ else if(act==='tclose')closeToday();
  else if(act==='arc-p')projArchiveFlow(id);
  else if(act==='block'){const f=findTask(id);f.t.blocked=!f.t.blocked;commit()}
  else if(act==='open-t')openTask(id);
@@ -194,10 +223,11 @@ document.addEventListener('click',e=>{
 });
 function showMenu(items,a){const m=document.getElementById('menu');m.innerHTML=items.join('');m.style.display='block';const r=a.getBoundingClientRect();m.style.left=Math.max(4,Math.min(r.left,innerWidth-m.offsetWidth-4))+'px';m.style.top=Math.max(4,Math.min(r.bottom+2,innerHeight-m.offsetHeight-4))+'px'}
 const mi=(label,id,arg)=>`<button data-act="mv" data-id="${id}" data-arg="${arg}">${label}</button>`;
-function menuTask(id,a){const f=findTask(id);const it=[mi('⤒ Move to top',id,'top'),mi('⤓ Move to bottom',id,'bottom'),mi('Toggle waiting',id,'blk'),mi('Details…',id,'tdet'),'<div class="sep">Move to</div>'];
+function menuTask(id,a){const f=findTask(id);const it=[mi('⤒ Move to top',id,'top'),mi('⤓ Move to bottom',id,'bottom'),mi(inToday(id)?'☀ Remove from Today':'☀ Send to Today',id,'today'),mi('Toggle waiting',id,'blk'),mi('Details…',id,'tdet'),'<div class="sep">Move to</div>'];
  if(f.col!=='unsorted')it.push(mi('Unsorted Tasks',id,'to|unsorted'));S.active.forEach(p=>{if(p.id!==f.col)it.push(mi(esc(p.title),id,'to|'+p.id))});showMenu(it,a)}
 function menuProj(id,a){showMenu([mi('← Move left',id,'left'),mi('→ Move right',id,'right'),mi('Move to Later',id,'later'),mi('Complete & archive project',id,'parc'),mi('Details…',id,'pdet')],a)}
 function doMenu(k,id,arg){
+ if(k==='today')return toggleToday(id);
  if(k==='top'||k==='bottom'){const f=findTask(id);if(f)moveTask(id,f.col,k==='top'?0:null)}
  else if(k==='to')moveTask(id,arg,null);
  else if(k==='blk'){const f=findTask(id);f.t.blocked=!f.t.blocked}
@@ -212,7 +242,7 @@ function doMenu(k,id,arg){
 const ov=document.getElementById('ov'),modal=document.getElementById('modal');
 function closeModal(){ov.style.display='none';modal.innerHTML='';conflictOpen=false;render()}
 ov.addEventListener('mousedown',e=>{if(e.target===ov)closeModal()});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(drag)cancelDrag();else if(ov.style.display==='flex')closeModal();document.getElementById('menu').style.display='none'}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){const mn=document.getElementById('menu'),mopen=mn.style.display==='block';if(drag)cancelDrag();else if(ov.style.display==='flex')closeModal();else if(!mopen&&todayOpen)closeToday();mn.style.display='none'}});
 function ask(msg,label,cb,danger,onCancel){ov.style.display='flex';modal.innerHTML=`<div>${esc(msg)}</div><div class="row"><button class="btn" id="mc">Cancel</button><button class="btn ${danger?'danger':''}" id="mo">${esc(label)}</button></div>`;document.getElementById('mc').onclick=onCancel||closeModal;document.getElementById('mo').onclick=()=>{ov.style.display='none';modal.innerHTML='';cb()}}
 function bind(obj,fields){fields.forEach(([sel,key])=>{const el=modal.querySelector(sel);el.addEventListener('input',()=>{obj[key]=el.value;save()});el.addEventListener('change',()=>{obj[key]=el.value;save()})})}
 function openTask(id){const f=findTask(id);if(!f)return;const t=f.t;ov.style.display='flex';
@@ -220,7 +250,7 @@ function openTask(id){const f=findTask(id);if(!f)return;const t=f.t;ov.style.dis
  <div class="row"><div style="flex:1"><label>Deadline</label><input type="date" id="f3" value="${t.deadline}"></div><div style="flex:1"><label>Status</label><select id="f4"><option value="open">Not complete</option><option value="blocked">Waiting / blocked</option><option value="done">Complete</option></select></div></div>
  <div class="row"><button class="btn danger" id="del">Delete task</button><button class="btn" id="cl">Done</button></div>`;
  bind(t,[['#f1','title'],['#f2','notes'],['#f3','deadline']]);const s=modal.querySelector('#f4');s.value=t.done?'done':t.blocked?'blocked':'open';
- s.onchange=()=>{if(s.value==='done'&&f.col==='unsorted'){archiveTask(id);ov.style.display='none';modal.innerHTML='';return}t.done=s.value==='done';t.blocked=s.value==='blocked';save()};
+ s.onchange=()=>{if(s.value==='done'&&f.col==='unsorted'&&!inToday(id)){archiveTask(id);ov.style.display='none';modal.innerHTML='';return}t.done=s.value==='done';t.blocked=s.value==='blocked';save()};
  modal.querySelector('#cl').onclick=closeModal;modal.querySelector('#del').onclick=()=>ask('Delete this task permanently?','Delete',()=>{const g=findTask(id);g.l.splice(g.i,1);commit()},1)}
 function openProj(id){const p=findProj(id);if(!p)return;const act=S.active.includes(p);ov.style.display='flex';
  modal.innerHTML=`<div><label>Project title</label><input id="f1" value="${esc(p.title)}"></div><div><label>Notes</label><textarea id="f2">${esc(p.notes)}</textarea></div>
@@ -251,25 +281,31 @@ document.addEventListener('pointerdown',e=>{
  if(e.button!==0||e.target.closest('button,input,textarea,select,#menu,#ov'))return;
  const t=e.target.closest('[data-task]'),g=e.target.closest('.pcol > .ph'),l=e.target.closest('[data-lrow]');let kind,el,id;
  if(t){kind='task';el=t;id=t.dataset.task}else if(g){el=g.closest('[data-proj]');kind='proj';id=el.dataset.proj}else if(l){kind='later';el=l;id=l.dataset.lrow}else return;
- drag={kind,el,id,sx:e.clientX,sy:e.clientY,x:e.clientX,y:e.clientY,on:false,tgt:null,timer:null}});
+ drag={kind,el,id,src:e.target.closest('#tpanel')?'today':'',sx:e.clientX,sy:e.clientY,x:e.clientX,y:e.clientY,on:false,tgt:null,timer:null}});
 document.addEventListener('pointermove',e=>{if(!drag)return;drag.x=e.clientX;drag.y=e.clientY;
  if(!drag.on){if(Math.hypot(e.clientX-drag.sx,e.clientY-drag.sy)<5)return;startDrag()}
  e.preventDefault();update()},{passive:false});
 document.addEventListener('pointerup',()=>{if(!drag)return;const d=drag;if(!d.on){drag=null;return}
  const t=d.tgt;endDrag();noClick=true;setTimeout(()=>noClick=false,0);
- if(t){if(d.kind==='task')moveTask(d.id,t.col,t.idx);else if(t.later)toLater(d.id);else moveProj(d.id,t.idx);commit()}});
+ if(t){if(d.kind==='task'){if(t.today)reorderToday(d.id,t.idx);else moveTask(d.id,t.col,t.idx)}else if(t.later)toLater(d.id);else moveProj(d.id,t.idx);commit()}});
 document.addEventListener('pointercancel',()=>{if(drag)cancelDrag()});
 function startDrag(){const d=drag;d.on=true;const r=d.el.getBoundingClientRect();d.ox=d.sx-r.left;d.oy=d.sy-r.top;
  const gh=d.el.cloneNode(true);gh.id='ghost';gh.style.width=r.width+'px';if(d.kind==='proj')gh.style.maxHeight='240px';gh.style.overflow='hidden';document.body.appendChild(gh);d.ghost=gh;
  d.el.classList.add('dragging');document.body.classList.add('dnd');document.getElementById('menu').style.display='none';
  d.timer=setInterval(()=>{autoscroll();update()},30)}
 function autoscroll(){const b=document.getElementById('board'),r=b.getBoundingClientRect(),d=drag;
+ if(d.src==='today'){const bd=document.getElementById('tbody');if(bd){const br=bd.getBoundingClientRect();if(d.y<br.top+30)bd.scrollTop-=10;else if(d.y>br.bottom-30)bd.scrollTop+=10}return}
  const ur=document.getElementById('unsorted').getBoundingClientRect(),la=document.getElementById('later').getBoundingClientRect();
  let lo=Math.max(r.left,ur.right),hi=Math.min(r.right,la.left);if(hi-lo<150){lo=r.left;hi=r.right}
  if(d.x<lo+50&&d.x>=lo)b.scrollLeft-=14;else if(d.x>hi-50&&d.x<=hi)b.scrollLeft+=14;
  if(d.kind==='task'&&d.tgt){const l=document.querySelector(`[data-col="${d.tgt.col}"] .tasks`);if(l){const lr=l.getBoundingClientRect();if(d.y<lr.top+24)l.scrollTop-=10;else if(d.y>lr.bottom-24)l.scrollTop+=10}}}
 function update(){const d=drag;if(!d||!d.on)return;d.ghost.style.left=(d.x-d.ox)+'px';d.ghost.style.top=(d.y-d.oy)+'px';
  document.querySelectorAll('.over').forEach(x=>x.classList.remove('over'));d.tgt=null;ind.style.display='none';
+ if(d.kind==='task'&&d.src==='today'){const list=document.getElementById('tlist');if(!list)return;const lr=list.getBoundingClientRect(),rows=[...list.querySelectorAll('.task:not(.dragging)')];
+  let idx=0;for(const w of rows){const r=w.getBoundingClientRect();if(d.y>r.top+r.height/2)idx++;else break}
+  let y=rows.length===0?lr.top+2:idx<rows.length?rows[idx].getBoundingClientRect().top-1:rows[rows.length-1].getBoundingClientRect().bottom+1;
+  const bl=document.getElementById('tbody').getBoundingClientRect();y=Math.max(bl.top,Math.min(y,bl.bottom-3));
+  Object.assign(ind.style,{display:'block',left:lr.left+'px',width:lr.width+'px',top:y+'px',height:'3px'});d.tgt={today:true,idx};return}
  if(d.kind==='task'){
   let best=null,bd=1e9;document.querySelectorAll('[data-col]').forEach(c=>{const r=c.getBoundingClientRect(),dx=d.x<r.left?r.left-d.x:d.x>r.right?d.x-r.right:0;if(dx<bd){bd=dx;best=c}});
   if(!best)return;const list=best.querySelector('.tasks'),lr=list.getBoundingClientRect(),rows=[...list.querySelectorAll('.task:not(.dragging)')];
@@ -309,12 +345,79 @@ function openArchive(){const A=S.archive;ov.style.display='flex';
   else if(k==='dt'){const t=A.tasks.find(x=>x.id===id);ask(`Permanently delete "${t.title}"?`,'Delete',()=>{A.tasks=A.tasks.filter(x=>x!==t);commit();openArchive()},1,openArchive)}}}
 document.getElementById('arch').onclick=openArchive;
 
+
+/* ---------- Today's List ---------- */
+const RESET_HOUR=6; /* the planner "day" changes at this hour (6 = 6:00 AM). Change this number to move the reset time. */
+let todayOpen=false,todayPick=false,todayRefocus=false,cloudReady=false,authKnown=false;
+const inToday=id=>S.today.includes(id);
+function dayKey(d){const x=new Date((d||new Date()).getTime()-RESET_HOUR*3600000);return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0')}
+function pruneToday(d){const vis=new Set();d.unsorted.forEach(t=>vis.add(t.id));d.active.forEach(p=>p.tasks.forEach(t=>vis.add(t.id)));
+ const seen=new Set();d.today=(d.today||[]).filter(id=>vis.has(id)&&!seen.has(id)&&seen.add(id));
+ if(!d.todayAdded||typeof d.todayAdded!=='object'||Array.isArray(d.todayAdded))d.todayAdded={};
+ Object.keys(d.todayAdded).forEach(k=>{if(!seen.has(k))delete d.todayAdded[k]})}
+function todayItems(){return S.today.map(id=>findTask(id)).filter(f=>f&&(f.col==='unsorted'||S.active.some(p=>p.id===f.col)))}
+function toggleToday(id){const f=findTask(id);if(!f)return;
+ if(inToday(id)){S.today=S.today.filter(x=>x!==id);delete S.todayAdded[id];if(f.col==='unsorted'&&f.t.done)archiveTask(id);else commit();return}
+ if(!(f.col==='unsorted'||S.active.some(p=>p.id===f.col)))return;
+ S.today.unshift(id);S.todayAdded[id]=dayKey();commit()}
+function openToday(){todayOpen=true;renderToday()}
+function closeToday(){todayOpen=false;todayPick=false;renderToday()}
+function reorderToday(id,idx){const ids=[...document.querySelectorAll('#tlist .task')].map(r=>r.dataset.task).filter(x=>x!==id);
+ ids.splice(Math.min(idx,ids.length),0,id);S.today=ids.concat(S.today.filter(x=>!ids.includes(x)))}
+function maybeReset(){
+ if(FB.apiKey&&!authKnown)return;if(cloud.ref&&!cloudReady)return;if(busy())return;
+ const k=dayKey();
+ if(!S.todayReset){S.todayReset=k;persist();return}
+ if(k<=S.todayReset)return;
+ const keep=[];let n=0;
+ S.today.forEach(id=>{const f=findTask(id);if(!f)return;
+  if(f.t.done){n++;delete S.todayAdded[id];if(f.col==='unsorted'){f.l.splice(f.i,1);f.t.completedAt=Date.now();S.archive.tasks.unshift(f.t)}}else keep.push(id)});
+ S.today=keep;S.todayReset=k;commit();
+ if(n)toast('New day: '+n+' completed task'+(n===1?'':'s')+' cleared from Today\'s List.')}
+setInterval(maybeReset,60000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)maybeReset()});
+function pickerHTML(){
+ const inT=new Set(S.today),t0=today(),due=[],groups=[];
+ const row=(t,tag)=>`<div class="prow"><button class="btn" data-act="today" data-id="${t.id}" title="Add to Today's List">＋</button><span class="pt2">${esc(t.title)}</span>${tag?`<span class="meta">${esc(tag)}</span>`:''}${t.deadline?`<span class="meta"><span class="dl ${t.deadline<t0?'od':'fut'}">📅 ${fmt(t.deadline)}</span></span>`:''}${t.blocked?'<span title="Waiting">⏳</span>':''}</div>`;
+ const open=t=>!t.done&&!inT.has(t.id);
+ S.unsorted.filter(t=>open(t)&&t.deadline&&t.deadline<=t0).forEach(t=>due.push([t,'Unsorted']));
+ S.active.forEach(p=>p.tasks.filter(t=>open(t)&&t.deadline&&t.deadline<=t0).forEach(t=>due.push([t,p.title])));
+ due.sort((a,b)=>a[0].deadline<b[0].deadline?-1:1);
+ if(due.length)groups.push('<div class="psec">Due today or overdue</div>'+due.map(x=>row(x[0],x[1])).join(''));
+ const rest=ts=>ts.filter(t=>open(t)&&!(t.deadline&&t.deadline<=t0));
+ const u=rest(S.unsorted);if(u.length)groups.push('<div class="psec">Unsorted Tasks</div>'+u.map(t=>row(t)).join(''));
+ S.active.forEach(p=>{const r=rest(p.tasks);if(r.length)groups.push(`<div class="psec">${esc(p.title)}</div>`+r.map(t=>row(t)).join(''))});
+ return '<div class="pick">'+(groups.join('')||'<div class="empty" style="font-size:13px;padding:8px">Every open task is already on Today\'s List.</div>')+'</div>'}
+function renderToday(){
+ const box=document.getElementById('today');box.style.display=todayOpen?'flex':'none';
+ {const n=todayItems().filter(f=>!f.t.done).length;const b=document.getElementById('tbtn');b.textContent='☀ Today'+(n?' ('+n+')':'');b.classList.toggle('open',todayOpen)}
+ if(!todayOpen){box.innerHTML='';return}
+ const old=document.getElementById('tbody'),sc=old?old.scrollTop:0,items=todayItems(),done=items.filter(f=>f.t.done).length,key=dayKey();
+ const rows=items.map(f=>{const added=S.todayAdded[f.t.id];let carry=0;if(added)carry=Math.max(0,Math.round((Date.parse(key+'T00:00:00Z')-Date.parse(added+'T00:00:00Z'))/864e5));
+  return taskHTML(f.t,{tag:f.col==='unsorted'?'Unsorted':(findProj(f.col)||{}).title||'',carry})}).join('');
+ const [yy,mm,dd]=key.split('-').map(Number),longDate=new Date(yy,mm-1,dd).toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'});
+ const rt=((RESET_HOUR+11)%12+1)+':00 '+(RESET_HOUR<12?'AM':'PM');
+ box.innerHTML=`<div id="tpanel"><div id="thead"><h2>☀ Today's List</h2><span class="cnt">${items.length?done+' of '+items.length+' done':''}</span><button class="btn" data-act="tclose" title="Back to the full board (Esc)">✕ Close</button></div>
+ <div class="tsub">${esc(longDate)} · completed tasks clear at ${rt}</div>
+ <input id="tadd" placeholder="+ Add a new task to Today (Enter)">
+ <div id="tbody"><div id="tlist">${rows||'<div class="empty" style="font-size:13px;padding:10px">Nothing on Today\'s List yet. Use the button below, or the ☀ button on any task on the board.</div>'}</div>
+ ${items.length&&done===items.length?'<div class="arcbar">🎉 Everything on Today\'s List is done</div>':''}
+ <div style="padding:8px 4px 0"><button class="btn" data-act="tpick">${todayPick?'Hide task picker':'＋ Add tasks from your board'}</button></div>${todayPick?pickerHTML():''}</div></div>`;
+ const nb=document.getElementById('tbody');if(nb)nb.scrollTop=sc;
+ if(todayRefocus){const i=document.getElementById('tadd');if(i)i.focus();todayRefocus=false}}
+document.getElementById('today').addEventListener('mousedown',e=>{if(e.target.id==='today')closeToday()});
+document.getElementById('tbtn').onclick=()=>todayOpen?closeToday():openToday();
+document.addEventListener('keydown',e=>{
+ if(e.key==='Enter'&&e.target.id==='tadd'&&!e.isComposing&&e.target.value.trim()){const t=mkTask(e.target.value.trim());S.unsorted.unshift(t);S.today.unshift(t.id);S.todayAdded[t.id]=dayKey();todayRefocus=true;commit();return}
+ if((e.key==='t'||e.key==='T')&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName||'')&&ov.style.display!=='flex'&&!drag){e.preventDefault();todayOpen?closeToday():openToday()}});
+
 /* ---------- cloud sync (Firebase Auth + Firestore) ---------- */
 const $=id=>document.getElementById(id);
 let cloud={},pushing=false,pushTimer=null,editSeq=0,conflictOpen=false;
 const isBlank=d=>!d.active.length&&!d.later.length&&!d.unsorted.length&&!(d.archive&&(d.archive.projects.length||d.archive.tasks.length));
 const busy=()=>(drag&&drag.on)||ov.style.display==='flex';
-function setStatus(k,x){const m={local:'Saved on this device only (cloud not set up)',out:'Not signed in - saved on this device only',saving:'☁ Saving…',synced:'☁ Synced '+new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}),offline:'Offline - will sync when back online',error:'Sync problem - will retry'};
+function setStatus(k,x){if(k==='synced'){cloudReady=true;setTimeout(maybeReset,0)}else if(k==='local'||k==='out')setTimeout(maybeReset,0);
+ const m={local:'Saved on this device only (cloud not set up)',out:'Not signed in - saved on this device only',saving:'☁ Saving…',synced:'☁ Synced '+new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}),offline:'Offline - will sync when back online',error:'Sync problem - will retry'};
  $('sync').textContent=m[k]+(x?' ('+x+')':'');$('sin').style.display=k==='out'?'':'none';$('sout').style.display=cloud.user?'':'none'}
 function schedulePush(){if(!cloud.ref)return;clearTimeout(pushTimer);pushTimer=setTimeout(()=>push(false),1500)}
 async function push(force){
@@ -346,7 +449,7 @@ async function initCloud(){
  try{const b='https://www.gstatic.com/firebasejs/10.14.1/';
   const[A,Au,F]=await Promise.all([import(b+'firebase-app.js'),import(b+'firebase-auth.js'),import(b+'firebase-firestore.js')]);
   cloud.Au=Au;cloud.F=F;const app=A.initializeApp(FB);cloud.auth=Au.getAuth(app);cloud.db=F.getFirestore(app);
-  Au.onAuthStateChanged(cloud.auth,u=>{cloud.user=u;if(cloud.unsub){cloud.unsub();cloud.unsub=null}cloud.ref=null;
+  Au.onAuthStateChanged(cloud.auth,u=>{authKnown=true;cloud.user=u;if(cloud.unsub){cloud.unsub();cloud.unsub=null}cloud.ref=null;
    if(!u){setStatus('out');return}
    cloud.ref=F.doc(cloud.db,'boards',u.uid);setStatus('saving');
    cloud.unsub=F.onSnapshot(cloud.ref,s=>{if(s.metadata.hasPendingWrites)return;
@@ -356,7 +459,8 @@ async function initCloud(){
     if(c==='auth/popup-blocked'||c==='auth/operation-not-supported-in-this-environment')Au.signInWithRedirect(cloud.auth,P());else if(c!=='auth/popup-closed-by-user'&&c!=='auth/cancelled-popup-request')setStatus('error',c)}};
   $('sout').onclick=()=>Au.signOut(cloud.auth);
   addEventListener('online',()=>{if(meta.dirty)push(false)});
- }catch(e){setStatus('error','could not load Firebase')}}
+ }catch(e){authKnown=true;setStatus('error','could not load Firebase');maybeReset()}}
+if(todayItems().some(f=>!f.t.done))todayOpen=true;
 render();initCloud();
 </script>
 </body></html>
